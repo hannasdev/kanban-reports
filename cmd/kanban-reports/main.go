@@ -14,6 +14,8 @@ func main() {
 	// Define command-line flags
 	csvPath := flag.String("csv", "", "Path to the kanban CSV file")
 	reportType := flag.String("type", "contributor", "Type of report: contributor, epic, product-area, team")
+	metricsType := flag.String("metrics", "", "Type of metrics: lead-time, throughput, flow, estimation, age, improvement, all")
+	periodType := flag.String("period", "month", "Time period for reports: week, month")
 	startDateStr := flag.String("start", "", "Start date (YYYY-MM-DD)")
 	endDateStr := flag.String("end", "", "End date (YYYY-MM-DD)")
 	lastNDays := flag.Int("last", 0, "Generate report for the last N days")
@@ -29,7 +31,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Parse report type
+	// Parse report type and metrics type
 	var repType reports.ReportType
 	switch *reportType {
 	case "contributor":
@@ -41,7 +43,47 @@ func main() {
 	case "team":
 		repType = reports.ReportTypeTeam
 	default:
-		fmt.Printf("Error: Unknown report type: %s\n", *reportType)
+		if *metricsType == "" { // Only error if metrics type is also not specified
+			fmt.Printf("Error: Unknown report type: %s\n", *reportType)
+			flag.Usage()
+			os.Exit(1)
+		}
+	}
+	
+	// Parse metrics type
+	var metType reports.MetricsType
+	switch *metricsType {
+	case "":
+		// No metrics specified, using report type
+	case "lead-time":
+		metType = reports.MetricsTypeLeadTime
+	case "throughput":
+		metType = reports.MetricsTypeThroughput
+	case "flow":
+		metType = reports.MetricsTypeFlow
+	case "estimation":
+		metType = reports.MetricsTypeEstimation
+	case "age":
+		metType = reports.MetricsTypeAge
+	case "improvement":
+		metType = reports.MetricsTypeImprovement
+	case "all":
+		metType = reports.MetricsTypeAll
+	default:
+		fmt.Printf("Error: Unknown metrics type: %s\n", *metricsType)
+		flag.Usage()
+		os.Exit(1)
+	}
+	
+	// Parse period type
+	var perType reports.PeriodType
+	switch *periodType {
+	case "week":
+		perType = reports.PeriodTypeWeek
+	case "month":
+		perType = reports.PeriodTypeMonth
+	default:
+		fmt.Printf("Error: Unknown period type: %s\n", *periodType)
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -102,28 +144,41 @@ func main() {
 
 	fmt.Printf("Loaded %d kanban items\n", len(items))
 
-	// Generate report
-	fmt.Println("Generating report...")
+	// Generate report or metrics
+	fmt.Println("Generating output...")
 	reporter := reports.NewReporter(items)
-	report, err := reporter.GenerateReport(repType, startDate, endDate)
-	if err != nil {
-		fmt.Printf("Error generating report: %v\n", err)
-		os.Exit(1)
+	
+	var outputContent string
+	
+	if *metricsType != "" {
+		// Generate metrics
+		outputContent, err = reporter.GenerateMetrics(metType, perType, startDate, endDate)
+		if err != nil {
+			fmt.Printf("Error generating metrics: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		// Generate regular report
+		outputContent, err = reporter.GenerateReport(repType, startDate, endDate)
+		if err != nil {
+			fmt.Printf("Error generating report: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	// Output report
 	if *outputPath != "" {
 		// Save to file
-		err = os.WriteFile(*outputPath, []byte(report), 0644)
+		err = os.WriteFile(*outputPath, []byte(outputContent), 0644)
 		if err != nil {
-			fmt.Printf("Error writing report to file: %v\n", err)
+			fmt.Printf("Error writing output to file: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Report saved to: %s\n", *outputPath)
+		fmt.Printf("Output saved to: %s\n", *outputPath)
 	} else {
 		// Print to console
-		fmt.Println("\nReport:")
+		fmt.Println("\nResults:")
 		fmt.Println("-------")
-		fmt.Println(report)
+		fmt.Println(outputContent)
 	}
 }
