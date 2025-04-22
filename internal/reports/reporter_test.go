@@ -217,22 +217,22 @@ func TestGenerateReport(t *testing.T) {
 		{
 			name:       "Contributor Report",
 			reportType: ReportTypeContributor,
-			contains:   []string{"Story Points by Contributor", "john@example.com", "jane@example.com"},
+			contains:   []string{"Report Type: contributor", "Date Range:", "Story Points by Contributor", "john@example.com", "jane@example.com"},
 		},
 		{
 			name:       "Epic Report",
 			reportType: ReportTypeEpic,
-			contains:   []string{"Story Points by Epic", "Epic 1"},
+			contains:   []string{"Report Type: epic", "Date Range:", "Story Points by Epic", "Epic 1"},
 		},
 		{
 			name:       "Product Area Report",
 			reportType: ReportTypeProductArea,
-			contains:   []string{"Story Points by Product Area", "Backend", "Frontend"},
+			contains:   []string{"Report Type: product-area", "Date Range:", "Story Points by Product Area", "Backend", "Frontend"},
 		},
 		{
 			name:       "Team Report",
 			reportType: ReportTypeTeam,
-			contains:   []string{"Story Points by Team", "Team A"},
+			contains:   []string{"Report Type: team", "Date Range:", "Story Points by Team", "Team A"},
 		},
 	}
 	
@@ -258,3 +258,164 @@ func TestGenerateReport(t *testing.T) {
 	}
 }
 
+func TestAddDateRangeInfo(t *testing.T) {
+	reporter := NewReporter(nil)
+	
+	// Sample report content
+	reportContent := "Story Points by Contributor:\n\njohn@example.com          5.0 points  2 items\n"
+	
+	tests := []struct {
+		name       string
+		reportType ReportType
+		startDate  time.Time
+		endDate    time.Time
+		adHocFilter AdHocFilterType
+		expected   []string
+	}{
+		{
+			name:       "Full date range",
+			reportType: ReportTypeContributor,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: AdHocFilterInclude,
+			expected:   []string{
+				"Report Type: contributor",
+				"Date Range: 2024-05-01 to 2024-05-31",
+				"Story Points by Contributor:",
+			},
+		},
+		{
+			name:       "Only start date",
+			reportType: ReportTypeEpic,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Time{},
+			adHocFilter: AdHocFilterInclude,
+			expected:   []string{
+				"Report Type: epic",
+				"From: 2024-05-01",
+				"Story Points by Contributor:",
+			},
+		},
+		{
+			name:       "Only end date",
+			reportType: ReportTypeTeam,
+			startDate:  time.Time{},
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: AdHocFilterInclude,
+			expected:   []string{
+				"Report Type: team",
+				"To: 2024-05-31",
+				"Story Points by Contributor:",
+			},
+		},
+		{
+			name:       "No date range",
+			reportType: ReportTypeProductArea,
+			startDate:  time.Time{},
+			endDate:    time.Time{},
+			adHocFilter: AdHocFilterInclude,
+			expected:   []string{
+				"Report Type: product-area",
+				"Date Range: All Time",
+				"Story Points by Contributor:",
+			},
+		},
+		{
+			name:       "With ad-hoc exclude filter",
+			reportType: ReportTypeContributor,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: AdHocFilterExclude,
+			expected:   []string{
+				"Report Type: contributor",
+				"Date Range: 2024-05-01 to 2024-05-31",
+				"Filter: Excluding ad-hoc requests",
+				"Story Points by Contributor:",
+			},
+		},
+		{
+			name:       "With ad-hoc only filter",
+			reportType: ReportTypeContributor,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: AdHocFilterOnly,
+			expected:   []string{
+				"Report Type: contributor",
+				"Date Range: 2024-05-01 to 2024-05-31",
+				"Filter: Only ad-hoc requests",
+				"Story Points by Contributor:",
+			},
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reporter.adHocFilter = tt.adHocFilter
+			result := reporter.addDateRangeInfo(reportContent, tt.reportType, tt.startDate, tt.endDate)
+			
+			for _, expectedStr := range tt.expected {
+				if !strings.Contains(result, expectedStr) {
+					t.Errorf("Expected report to contain: %s\nGot: %s", expectedStr, result)
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateReportWithDateRange(t *testing.T) {
+	// Create test items
+	now := time.Now()
+	items := []models.KanbanItem{
+		{
+			ID:          "1",
+			Name:        "Task 1",
+			Owners:      []string{"john@example.com"},
+			IsCompleted: true,
+			CompletedAt: now.AddDate(0, 0, -5), // 5 days ago
+			Estimate:    3,
+			Epic:        "Epic 1",
+			Team:        "Team A",
+			ProductArea: "Backend",
+		},
+		{
+			ID:          "2",
+			Name:        "Task 2",
+			Owners:      []string{"jane@example.com"},
+			IsCompleted: true,
+			CompletedAt: now.AddDate(0, 0, -10), // 10 days ago
+			Estimate:    2,
+			Epic:        "Epic 1",
+			Team:        "Team A",
+			ProductArea: "Frontend",
+		},
+	}
+	
+	reporter := NewReporter(items)
+	
+	// Test with date range
+	startDate := now.AddDate(0, 0, -7) // 7 days ago
+	endDate := now
+	
+	report, err := reporter.GenerateReport(ReportTypeContributor, startDate, endDate)
+	if err != nil {
+		t.Fatalf("GenerateReport() error = %v", err)
+	}
+	
+	// Check that the report contains date range information
+	expectedStrings := []string{
+		"Report Type: contributor",
+		"Date Range:",
+		"john@example.com", // Should only include items from last 7 days
+	}
+	
+	for _, expected := range expectedStrings {
+		if !strings.Contains(report, expected) {
+			t.Errorf("Report doesn't contain expected string: %s", expected)
+		}
+	}
+	
+	// Check that items outside date range are excluded
+	if strings.Contains(report, "jane@example.com") {
+		t.Errorf("Report includes items outside the date range")
+	}
+}

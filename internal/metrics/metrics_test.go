@@ -210,3 +210,120 @@ func TestGenerate(t *testing.T) {
 		})
 	}
 }
+
+func TestAddDateRangeInfo(t *testing.T) {
+	generator := NewGenerator(nil)
+	
+	// Sample metrics content
+	metricsContent := "# Lead Time Analysis by Story Point Size (in days)\n\n## Lead Time (Creation to Completion)\n"
+	
+	tests := []struct {
+		name       string
+		metricsType MetricsType
+		periodType PeriodType
+		startDate  time.Time
+		endDate    time.Time
+		adHocFilter reports.AdHocFilterType
+		expected   []string
+	}{
+		{
+			name:       "Full date range",
+			metricsType: MetricsTypeLeadTime,
+			periodType: PeriodTypeMonth,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: reports.AdHocFilterInclude,
+			expected:   []string{
+				"Metrics Type: lead-time",
+				"Period Type: month",
+				"Date Range: 2024-05-01 to 2024-05-31",
+				"# Lead Time Analysis",
+			},
+		},
+		{
+			name:       "Only start date",
+			metricsType: MetricsTypeThroughput,
+			periodType: PeriodTypeWeek,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Time{},
+			adHocFilter: reports.AdHocFilterInclude,
+			expected:   []string{
+				"Metrics Type: throughput",
+				"Period Type: week",
+				"From: 2024-05-01",
+				"# Lead Time Analysis",
+			},
+		},
+		{
+			name:       "Only end date",
+			metricsType: MetricsTypeFlow,
+			periodType: PeriodTypeMonth,
+			startDate:  time.Time{},
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: reports.AdHocFilterInclude,
+			expected:   []string{
+				"Metrics Type: flow",
+				"Period Type: month",
+				"To: 2024-05-31",
+				"# Lead Time Analysis",
+			},
+		},
+		{
+			name:       "No date range",
+			metricsType: MetricsTypeEstimation,
+			periodType: PeriodTypeMonth,
+			startDate:  time.Time{},
+			endDate:    time.Time{},
+			adHocFilter: reports.AdHocFilterInclude,
+			expected:   []string{
+				"Metrics Type: estimation",
+				"Period Type: month",
+				"Date Range: All Time",
+				"# Lead Time Analysis",
+			},
+		},
+		{
+			name:       "With ad-hoc exclude filter",
+			metricsType: MetricsTypeLeadTime,
+			periodType: PeriodTypeMonth,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: reports.AdHocFilterExclude,
+			expected:   []string{
+				"Metrics Type: lead-time",
+				"Period Type: month",
+				"Date Range: 2024-05-01 to 2024-05-31",
+				"Filter: Excluding ad-hoc requests",
+				"# Lead Time Analysis",
+			},
+		},
+		{
+			name:       "With ad-hoc only filter",
+			metricsType: MetricsTypeLeadTime,
+			periodType: PeriodTypeMonth,
+			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
+			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
+			adHocFilter: reports.AdHocFilterOnly,
+			expected:   []string{
+				"Metrics Type: lead-time",
+				"Period Type: month",
+				"Date Range: 2024-05-01 to 2024-05-31",
+				"Filter: Only ad-hoc requests",
+				"# Lead Time Analysis",
+			},
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generator.adHocFilter = tt.adHocFilter
+			result := generator.addDateRangeInfo(metricsContent, tt.metricsType, tt.periodType, tt.startDate, tt.endDate)
+			
+			for _, expectedStr := range tt.expected {
+				if !strings.Contains(result, expectedStr) {
+					t.Errorf("Expected metrics to contain: %s\nGot: %s", expectedStr, result)
+				}
+			}
+		})
+	}
+}
