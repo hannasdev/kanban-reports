@@ -10,8 +10,16 @@ A Go application for generating reports from Kanban board data exported as CSV. 
   - Epic (which larger initiatives the work belongs to)
   - Product Area (which product categories the work affects)
   - Team (which teams are delivering the most)
+- Generate advanced metrics:
+  - Lead Time Analysis (how long items take to complete)
+  - Throughput Analysis (completion rates over time)
+  - Flow Efficiency (active vs. waiting time)
+  - Estimation Accuracy (correlation between estimates and actual time)
+  - Work Item Age (analysis of current incomplete work)
+  - Team Improvement (month-over-month trends)
 - Filter by date ranges or last N days
 - Save reports to file or view in console
+- Automatic CSV delimiter detection (comma, tab, semicolon)
 
 ## Installation
 
@@ -21,7 +29,7 @@ A Go application for generating reports from Kanban board data exported as CSV. 
 
 ### From Source
 
-```zsh
+```bash
 # Clone the repository
 git clone https://github.com/hannasdev/kanban-reports.git
 cd kanban-reports
@@ -34,7 +42,7 @@ go build -o bin/kanban-reports ./cmd/kanban-reports
 
 ### Basic Usage
 
-```zsh
+```bash
 # Generate a contributor report for the last 7 days
 ./bin/kanban-reports --csv data/kanban-data.csv --type contributor --last 7
 
@@ -43,6 +51,15 @@ go build -o bin/kanban-reports ./cmd/kanban-reports
 
 # Save the report to a file
 ./bin/kanban-reports --csv data/kanban-data.csv --type product-area --last 14 --output product-report.txt
+
+# Generate lead time metrics by story point size
+./bin/kanban-reports --csv data/kanban-data.csv --metrics lead-time --last 90
+
+# Generate throughput metrics by week
+./bin/kanban-reports --csv data/kanban-data.csv --metrics throughput --period week --last 180
+
+# Generate all metrics for a specific date range
+./bin/kanban-reports --csv data/kanban-data.csv --metrics all --start 2024-01-01 --end 2024-06-30 --output all-metrics.txt
 ```
 
 ### Command Line Options
@@ -51,6 +68,8 @@ go build -o bin/kanban-reports ./cmd/kanban-reports
 |------|-------------|---------|
 | `--csv` | Path to the kanban CSV file (required) | `--csv data/kanban-data.csv` |
 | `--type` | Type of report to generate (contributor, epic, product-area, team) | `--type epic` |
+| `--metrics` | Type of metrics to generate (lead-time, throughput, flow, estimation, age, improvement, all) | `--metrics lead-time` |
+| `--period` | Time period for metrics reports (week, month) | `--period week` |
 | `--start` | Start date in YYYY-MM-DD format | `--start 2024-05-01` |
 | `--end` | End date in YYYY-MM-DD format | `--end 2024-05-31` |
 | `--last` | Generate report for the last N days | `--last 7` |
@@ -128,5 +147,182 @@ Backend                         25.0 points  10 items
 Frontend                        18.5 points   7 items
 Uncategorized                    5.0 points   2 items
 
-Total: 48.5 points across 19 item
+Total: 48.5 points across 19 items
 ```
+
+### Team Report
+
+Shows story points completed by team.
+
+Example output:
+
+```zsh
+Story Points by Team:
+
+Team Alpha                      30.0 points  12 items
+Team Beta                       20.5 points   8 items
+No Team                          4.0 points   2 items
+
+Total: 54.5 points across 22 items
+```
+
+## Metrics Types
+
+### Lead Time Metrics
+
+Analyzes how long items take to complete, broken down by story point size.
+
+Example output:
+
+```zsh
+# Lead Time Analysis by Story Point Size (in days)
+
+## Lead Time (Creation to Completion)
+
+Story points | Count | Min | Max | Avg | Median
+-------------|-------|-----|-----|-----|-------
+           1 |    15 | 2.5 | 8.3 | 4.2 |    3.8
+           3 |    12 | 3.1 | 9.7 | 5.8 |    5.2
+           5 |     8 | 5.7 | 15.2 | 10.1 |    9.5
+           8 |     5 | 7.2 | 21.5 | 14.3 |   12.8
+```
+
+### Throughput Metrics
+
+Shows completion rates over time, broken down by week or month.
+
+Example output:
+
+```zsh
+# Throughput Analysis by Month
+
+Month   | Items Completed | Story Points | Avg Points/Item
+--------|----------------|-------------|---------------
+2024-01 |             12 |        45.0 |           3.8
+2024-02 |             15 |        62.0 |           4.1
+2024-03 |             18 |        72.0 |           4.0
+```
+
+### Flow Efficiency Metrics
+
+Analyzes the percentage of time items spend in active states versus waiting.
+
+Example output:
+
+```zsh
+# Flow Efficiency Analysis
+
+State   | Avg Time (days) | % of Total Time
+--------|-----------------|---------------
+Waiting |            12.5 |         71.4%
+Active  |             5.0 |         28.6%
+
+Flow Efficiency: 28.6%
+```
+
+### Estimation Accuracy Metrics
+
+Compares story point estimates with actual completion times.
+
+Example output:
+
+```zsh
+# Estimation Accuracy Analysis
+
+## Time Spent per Story Point Size
+
+Story points | Count | Min Days/SP | Max Days/SP | Avg Days/SP | Median Days/SP
+-------------|-------|------------|------------|-------------|---------------
+           1 |    15 |        1.2 |        3.5 |         2.1 |             1.9
+           3 |    12 |        1.0 |        2.8 |         1.8 |             1.7
+           5 |     8 |        1.1 |        2.5 |         1.7 |             1.6
+```
+
+### Work Item Age Metrics
+
+Analyzes the age of current work items by state.
+
+Example output:
+
+```zsh
+# Current Work Item Age Analysis
+
+## In Progress (5 items)
+
+Min: 2.1, Max: 15.3, Avg: 7.2, Median: 5.5 days
+
+Oldest Items:
+
+- API Authentication Refactoring (15.3 days)
+- Payment Processing Bug (10.8 days)
+- User Profile UI Update (7.4 days)
+```
+
+### Team Improvement Metrics
+
+Shows trends in team performance over time.
+
+Example output:
+
+```zsh
+# Team Improvement Metrics
+
+Month   | Items | Points | Avg Lead Time | Avg Cycle Time | Lead Time Δ | Cycle Time Δ
+--------|-------|--------|---------------|----------------|------------|-------------
+2024-01 |    12 |   45.0 |          18.5 |            8.2 |            |             
+2024-02 |    15 |   62.0 |          16.8 |            7.5 | -1.7 (-9.2%) | -0.7 (-8.5%)
+2024-03 |    18 |   72.0 |          14.2 |            6.8 | -2.6 (-15.5%) | -0.7 (-9.3%)
+```
+
+## Project Structure
+
+```zsh
+kanban-reports/
+├── cmd/
+│   └── kanban-reports/        # Main application entry point
+│       └── main.go
+├── internal/
+│   ├── models/                # Data models
+│   │   └── kanban_item.go
+│   ├── parser/                # CSV parsing logic
+│   │   └── csv_parser.go
+│   └── reports/               # Report generation
+│       └── reports.go
+├── data/                      # Place your CSV files here
+│   └── kanban-data.csv
+├── go.mod
+└── go.sum
+```
+
+## Development
+
+### Adding New Report Types
+
+To add a new report type:
+
+1. Add a new report type constant in `internal/reports/reports.go`
+2. Add a new report generation function in the Reporter struct
+3. Update the switch statement in `GenerateReport` to handle the new type
+4. Update the main.go to accept the new report type as a command-line option
+
+### Modifying the CSV Parser
+
+If your CSV format changes, you may need to update:
+
+1. The `KanbanItem` struct in `internal/models/kanban_item.go`
+2. The parsing logic in `internal/parser/csv_parser.go`
+
+## Example Workflow
+
+1. Export your kanban data as a CSV file from your kanban board tool
+2. Place the CSV file in the `data/` directory
+3. Run the application with your desired report type and date range
+4. Analyze the generated report to gain insights into your team's productivity
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
