@@ -67,6 +67,45 @@ func (g *Generator) isAdHocRequest(item models.KanbanItem) bool {
 	return false
 }
 
+// addDateRangeInfo adds date range information to the beginning of the metrics report
+func (g *Generator) addDateRangeInfo(report string, metricsType MetricsType, periodType PeriodType, startDate, endDate time.Time) string {
+	// Create header with metrics type and date information
+	var header string
+	
+	// Format the header with date range information
+	if !startDate.IsZero() && !endDate.IsZero() {
+		header = fmt.Sprintf("Metrics Type: %s\nPeriod Type: %s\nDate Range: %s to %s\n\n", 
+			metricsType, 
+			periodType,
+			startDate.Format("2006-01-02"), 
+			endDate.Format("2006-01-02"))
+	} else if !startDate.IsZero() {
+		header = fmt.Sprintf("Metrics Type: %s\nPeriod Type: %s\nFrom: %s\n\n", 
+			metricsType,
+			periodType, 
+			startDate.Format("2006-01-02"))
+	} else if !endDate.IsZero() {
+		header = fmt.Sprintf("Metrics Type: %s\nPeriod Type: %s\nTo: %s\n\n", 
+			metricsType,
+			periodType, 
+			endDate.Format("2006-01-02"))
+	} else {
+		header = fmt.Sprintf("Metrics Type: %s\nPeriod Type: %s\nDate Range: All Time\n\n", 
+			metricsType,
+			periodType)
+	}
+	
+	// Add ad-hoc filtering information
+	switch g.adHocFilter {
+	case reports.AdHocFilterExclude:
+		header += "Filter: Excluding ad-hoc requests\n\n"
+	case reports.AdHocFilterOnly:
+		header += "Filter: Only ad-hoc requests\n\n"
+	}
+	
+	return header + report
+}
+
 // Generate generates metrics based on the specified type and time period
 func (g *Generator) Generate(metricsType MetricsType, periodType PeriodType, startDate, endDate time.Time) (string, error) {
 	// Filter items by completion date within range
@@ -77,24 +116,35 @@ func (g *Generator) Generate(metricsType MetricsType, periodType PeriodType, sta
 	}
 
 	// Generate appropriate metrics based on type
+	var metricsContent string
+	var err error
+
 	switch metricsType {
 	case MetricsTypeLeadTime:
-		return LeadTimeReport(filteredItems)
+		metricsContent, err = LeadTimeReport(filteredItems)
 	case MetricsTypeThroughput:
-		return ThroughputReport(filteredItems, string(periodType))
+		metricsContent, err = ThroughputReport(filteredItems, string(periodType))
 	case MetricsTypeFlow:
-		return FlowEfficiencyReport(filteredItems)
+		metricsContent, err = FlowEfficiencyReport(filteredItems)
 	case MetricsTypeEstimation:
-		return EstimationAccuracyReport(filteredItems)
+		metricsContent, err = EstimationAccuracyReport(filteredItems)
 	case MetricsTypeAge:
-		return WorkItemAgeReport(filteredItems, time.Now())
+		metricsContent, err = WorkItemAgeReport(filteredItems, time.Now())
 	case MetricsTypeImprovement:
-		return TeamImprovementReport(filteredItems)
+		metricsContent, err = TeamImprovementReport(filteredItems)
 	case MetricsTypeAll:
-		return GenerateAllReports(filteredItems, string(periodType))
+		metricsContent, err = GenerateAllReports(filteredItems, string(periodType))
 	default:
 		return "", fmt.Errorf("unknown metrics type: %s", metricsType)
 	}
+
+	if err != nil {
+		return "", err
+	}
+
+	// Add date range information to the metrics report
+	reportWithDateInfo := g.addDateRangeInfo(metricsContent, metricsType, periodType, startDate, endDate)
+	return reportWithDateInfo, nil
 }
 
 // GenerateAllReports generates all types of metrics reports
