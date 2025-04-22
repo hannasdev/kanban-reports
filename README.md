@@ -18,6 +18,7 @@ A Go application for generating reports from Kanban board data exported as CSV. 
   - Work Item Age (analysis of current incomplete work)
   - Team Improvement (month-over-month trends)
 - Filter by date ranges or last N days
+- Filter ad-hoc requests (include, exclude, or focus only on them)
 - Save reports to file or view in console
 - Automatic CSV delimiter detection (comma, tab, semicolon)
 
@@ -60,6 +61,12 @@ go build -o bin/kanban-reports ./cmd/kanban-reports
 
 # Generate all metrics for a specific date range
 ./bin/kanban-reports --csv data/kanban-data.csv --metrics all --start 2024-01-01 --end 2024-06-30 --output all-metrics.txt
+
+# Generate reports excluding ad-hoc requests
+./bin/kanban-reports --csv data/kanban-data.csv --type contributor --last 30 --ad-hoc exclude
+
+# Analyze only ad-hoc requests
+./bin/kanban-reports --csv data/kanban-data.csv --metrics throughput --last 90 --ad-hoc only
 ```
 
 ### Command Line Options
@@ -75,6 +82,7 @@ go build -o bin/kanban-reports ./cmd/kanban-reports
 | `--last` | Generate report for the last N days | `--last 7` |
 | `--output` | Path to save the report (optional) | `--output report.txt` |
 | `--delimiter` | CSV delimiter: comma, tab, semicolon, or auto (default: auto) | `--delimiter comma` |
+| `--ad-hoc` | How to handle ad-hoc requests: include, exclude, only (default: include) | `--ad-hoc exclude` |
 
 ## CSV Data Format
 
@@ -96,7 +104,7 @@ Additional useful columns:
 
 Example of the first row of CSV data:
 
-```zsh
+```csv
 id,name,type,requester,owners,description,is_completed,created_at,started_at,updated_at,moved_at,completed_at,estimate,external_ticket_count,external_tickets,is_blocked,is_a_blocker,due_date,labels,epic_labels,tasks,state,epic_id,epic,project_id,project,iteration_id,iteration,utc_offset,is_archived,team_id,team,epic_state,epic_is_archived,epic_created_at,epic_started_at,epic_due_date,milestone_id,milestone,milestone_state,milestone_created_at,milestone_started_at,milestone_due_date,milestone_categories,epic_planned_start_date,workflow,workflow_id,priority,severity,product_area,skill_set,technical_area,custom_fields
 ```
 
