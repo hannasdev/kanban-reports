@@ -21,6 +21,7 @@ func main() {
 	lastNDays := flag.Int("last", 0, "Generate report for the last N days")
 	outputPath := flag.String("output", "", "Path to save the report (optional)")
 	delimiterStr := flag.String("delimiter", "auto", "CSV delimiter: comma, tab, semicolon, or auto for automatic detection")
+	adHocFilter := flag.String("ad-hoc", "include", "How to handle ad-hoc requests: include, exclude, only")
 
 	flag.Parse()
 
@@ -118,6 +119,21 @@ func main() {
 		}
 	}
 
+	// Parse ad-hoc filter
+	var adHocFilterType reports.AdHocFilterType
+	switch *adHocFilter {
+	case "include":
+		adHocFilterType = reports.AdHocFilterInclude
+	case "exclude":
+		adHocFilterType = reports.AdHocFilterExclude
+	case "only":
+		adHocFilterType = reports.AdHocFilterOnly
+	default:
+		fmt.Printf("Error: Unknown ad-hoc filter type: %s\n", *adHocFilter)
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	// Parse CSV file
 	fmt.Println("Loading kanban data from:", *csvPath)
 	csvParser := parser.NewCSVParser(*csvPath)
@@ -146,7 +162,7 @@ func main() {
 
 	// Generate report or metrics
 	fmt.Println("Generating output...")
-	reporter := reports.NewReporter(items)
+	reporter := reports.NewReporter(items).WithAdHocFilter(adHocFilterType)
 	
 	var outputContent string
 	

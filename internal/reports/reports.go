@@ -3,6 +3,7 @@ package reports
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/hannasdev/kanban-reports/internal/models"
@@ -22,16 +23,36 @@ const (
 	ReportTypeTeam ReportType = "team"
 )
 
+// AdHocFilterType defines how to handle ad-hoc requests
+type AdHocFilterType string
+
+const (
+	// AdHocFilterInclude includes all items (default)
+	AdHocFilterInclude AdHocFilterType = "include"
+	// AdHocFilterExclude excludes ad-hoc requests
+	AdHocFilterExclude AdHocFilterType = "exclude"
+	// AdHocFilterOnly shows only ad-hoc requests
+	AdHocFilterOnly AdHocFilterType = "only"
+)
+
 // Reporter handles generation of different reports
 type Reporter struct {
 	items []models.KanbanItem
+	adHocFilter AdHocFilterType
 }
 
 // NewReporter creates a new reporter with the given items
 func NewReporter(items []models.KanbanItem) *Reporter {
 	return &Reporter{
 		items: items,
+		adHocFilter: AdHocFilterInclude,
 	}
+}
+
+// WithAdHocFilter sets the ad-hoc request filter
+func (r *Reporter) WithAdHocFilter(filter AdHocFilterType) *Reporter {
+	r.adHocFilter = filter
+	return r
 }
 
 // GenerateReport generates a report based on the specified type and time period
@@ -71,11 +92,29 @@ func (r *Reporter) filterItemsByDateRange(startDate, endDate time.Time) []models
 		// Check if completion date is within range
 		if (startDate.IsZero() || !item.CompletedAt.Before(startDate)) &&
 		   (endDate.IsZero() || !item.CompletedAt.After(endDate)) {
-			filtered = append(filtered, item)
+			
+			// Apply ad-hoc request filter
+			isAdHoc := r.isAdHocRequest(item)
+			
+			if (r.adHocFilter == AdHocFilterInclude) ||
+			   (r.adHocFilter == AdHocFilterExclude && !isAdHoc) ||
+			   (r.adHocFilter == AdHocFilterOnly && isAdHoc) {
+				filtered = append(filtered, item)
+			}
 		}
 	}
 	
 	return filtered
+}
+
+// isAdHocRequest checks if an item is an ad-hoc request (has "ad-hoc-request" label)
+func (r *Reporter) isAdHocRequest(item models.KanbanItem) bool {
+	for _, label := range item.Labels {
+		if strings.ToLower(label) == "ad-hoc-request" {
+			return true
+		}
+	}
+	return false
 }
 
 // generateContributorReport creates a report of story points by contributor
