@@ -155,6 +155,18 @@ func (r *Reporter) leadTimeReport(items []models.KanbanItem) (string, error) {
 	
 	// Calculate statistics for each point size
 	report := "# Lead Time Analysis by Story Point Size (in days)\n\n"
+	
+	// Add explanatory text
+	report += "## What is Lead Time?\n\n"
+	report += "Lead Time measures how long it takes for work to go from creation to completion. It's the total elapsed time that a customer waits for their request to be delivered.\n\n"
+	report += "- **Lead Time**: Time from when an item is created to when it's completed (includes both waiting and active time)\n"
+	report += "- **Cycle Time**: Time from when work actively starts on an item to when it's completed (active time only)\n\n"
+	report += "Lower values indicate faster delivery. Higher story point items typically have longer lead and cycle times.\n\n"
+	report += "## How to use this data:\n"
+	report += "- Compare different sized items to validate your estimation system\n"
+	report += "- Use these values to set realistic delivery expectations with stakeholders\n"
+	report += "- Track these metrics over time to identify process improvements\n\n"
+	
 	report += "## Lead Time (Creation to Completion)\n\n"
 	report += "Story points | Count | Min | Max | Avg | Median\n"
 	report += "-------------|-------|-----|-----|-----|-------\n"
@@ -238,6 +250,20 @@ func (r *Reporter) throughputReport(items []models.KanbanItem, periodType string
 	sort.Strings(periods)
 	
 	report := fmt.Sprintf("# Throughput Analysis by %s\n\n", periodName)
+	
+	// Add explanatory text
+	report += "## What is Throughput?\n\n"
+	report += "Throughput measures how many items your team completes in a given time period. It represents your delivery capacity and is a key metric for planning and forecasting.\n\n"
+	report += "- Higher numbers indicate greater delivery capacity\n"
+	report += "- Consistent throughput suggests a stable, predictable process\n"
+	report += "- Declining throughput may indicate impediments or reduced capacity\n"
+	report += "- Rising throughput may indicate process improvements or increased capacity\n\n"
+	report += "## How to use this data:\n"
+	report += "- Use average throughput to forecast future delivery capabilities\n"
+	report += "- Look for trends or patterns in delivery capacity\n"
+	report += "- Compare throughput across different time periods to identify improvements or issues\n"
+	report += "- Analyze the balance between different types of work (features, bugs, etc.)\n\n"
+	
 	report += fmt.Sprintf("%s | Items Completed | Story Points | Avg Points/Item\n", periodName)
 	report += "-------|----------------|-------------|---------------\n"
 	
@@ -330,6 +356,25 @@ func (r *Reporter) flowEfficiencyReport(items []models.KanbanItem) (string, erro
 	}
 	
 	report := "# Flow Efficiency Analysis\n\n"
+	
+	// Add explanatory text
+	report += "## What is Flow Efficiency?\n\n"
+	report += "Flow efficiency measures the percentage of time items spend being actively worked on versus waiting. It's a key metric in Lean and Kanban methodologies.\n\n"
+	report += "**Flow Efficiency = (Active Time / Total Time) × 100%**\n\n"
+	report += "- **Waiting time**: Time from creation until work begins (queue time)\n"
+	report += "- **Active time**: Time from when work begins until completion (processing time)\n"
+	report += "- **Total time**: Sum of waiting and active time (lead time)\n\n"
+	report += "## Interpretation:\n"
+	report += "- **Low efficiency (10-30%)**: Common in many organizations. Items spend most of their time waiting.\n"
+	report += "- **Medium efficiency (30-50%)**: Generally considered good for knowledge work.\n"
+	report += "- **High efficiency (>50%)**: Excellent! Your team has minimal waiting time.\n\n"
+	report += "## How to improve flow efficiency:\n"
+	report += "- Limit work in progress (WIP)\n"
+	report += "- Reduce handoffs between teams\n"
+	report += "- Eliminate bottlenecks\n"
+	report += "- Implement pull systems\n"
+	report += "- Reduce batch sizes\n\n"
+	
 	report += "State | Avg Time (days) | % of Total Time\n"
 	report += "------|-----------------|---------------\n"
 	
@@ -351,7 +396,6 @@ func (r *Reporter) flowEfficiencyReport(items []models.KanbanItem) (string, erro
 		report += fmt.Sprintf("Waiting | %15.1f | %13.1f%%\n", waitAvg, waitPercent)
 		report += fmt.Sprintf("Active  | %15.1f | %13.1f%%\n", activeAvg, activePercent)
 		report += fmt.Sprintf("\nFlow Efficiency: %.1f%%\n", activePercent)
-		report += "\nNote: Flow efficiency is the percentage of time items spend in active states versus waiting states."
 	}
 	
 	return report, nil
@@ -374,6 +418,20 @@ func (r *Reporter) estimationAccuracyReport(items []models.KanbanItem) (string, 
 	
 	// Calculate cycle time per story point for each size
 	report := "# Estimation Accuracy Analysis\n\n"
+	
+	// Add explanatory text
+	report += "## What is Estimation Accuracy?\n\n"
+	report += "Estimation accuracy measures how well your story point estimates correlate with the actual time spent completing work. Ideally, there should be a consistent relationship between story points and completion time.\n\n"
+	report += "This analysis shows:\n"
+	report += "- How much time is spent per story point for different sized items\n"
+	report += "- Whether your story points consistently scale (e.g., do 3-point stories take about 3× as long as 1-point stories?)\n"
+	report += "- The correlation between estimates and actual completion times\n\n"
+	report += "## How to use this data:\n"
+	report += "- Look for consistency in the days/SP metric across different sizes\n"
+	report += "- Identify if certain sized items are consistently under or overestimated\n"
+	report += "- Use the correlation value to assess your estimation system's reliability\n"
+	report += "- Consider calibrating story point values based on actual completion times\n\n"
+	
 	report += "## Time Spent per Story Point Size\n\n"
 	report += "Story points | Count | Min Days/SP | Max Days/SP | Avg Days/SP | Median Days/SP\n"
 	report += "-------------|-------|------------|------------|-------------|---------------\n"
@@ -429,7 +487,11 @@ func (r *Reporter) estimationAccuracyReport(items []models.KanbanItem) (string, 
 	if len(allPoints) > 0 {
 		correlation := calculateCorrelation(allPoints, allTimes)
 		report += fmt.Sprintf("\nCorrelation between story points and cycle time: %.2f\n", correlation)
-		report += "\nNote: A correlation closer to 1.0 indicates that higher point items consistently take more time."
+		report += "\nInterpretation of correlation:\n"
+		report += "- **0.7-1.0**: Strong positive correlation. Excellent estimation system.\n"
+		report += "- **0.4-0.7**: Moderate correlation. Reasonably good estimates.\n"
+		report += "- **0.0-0.4**: Weak correlation. Estimates may need improvement.\n"
+		report += "- **Negative**: Inverse relationship. Estimation system needs significant review.\n"
 	}
 	
 	return report, nil
@@ -590,6 +652,22 @@ func (r *Reporter) teamImprovementReport(items []models.KanbanItem) (string, err
 	
 	// Generate report with month-over-month changes
 	report := "# Team Improvement Metrics\n\n"
+	
+	// Add explanatory text
+	report += "## What are Team Improvement Metrics?\n\n"
+	report += "Team Improvement Metrics track how your team's performance changes over time across several key dimensions. This helps identify trends, improvements, and areas that need attention.\n\n"
+	report += "The metrics tracked month-over-month include:\n"
+	report += "- **Item Count**: Number of completed items\n"
+	report += "- **Story Points**: Total points completed\n"
+	report += "- **Lead Time**: Average time from creation to completion\n"
+	report += "- **Cycle Time**: Average time from start to completion\n\n"
+	report += "## How to use this data:\n"
+	report += "- Look for trends in delivery capacity (items and points)\n"
+	report += "- Track improvements in lead time and cycle time\n"
+	report += "- Use delta (Δ) values to see percentage improvements\n"
+	report += "- Celebrate improvements and investigate regressions\n"
+	report += "- Set team goals based on historical performance\n\n"
+	
 	report += "Month | Items | Points | Avg Lead Time | Avg Cycle Time | Lead Time Δ | Cycle Time Δ\n"
 	report += "------|-------|--------|---------------|----------------|------------|-------------\n"
 	
