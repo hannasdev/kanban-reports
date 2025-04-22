@@ -1,25 +1,55 @@
 package parser
 
 import (
+	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/yourusername/kanban-reports/internal/models"
+	"github.com/hannasdev/kanban-reports/internal/models"
 )
 
 // CSVParser handles parsing of kanban CSV data
 type CSVParser struct {
-	filepath string
+	filepath  string
+	delimiter rune
 }
 
 // NewCSVParser creates a new CSV parser for the specified file
 func NewCSVParser(filepath string) *CSVParser {
 	return &CSVParser{
-		filepath: filepath,
+		filepath:  filepath,
+		delimiter: ',', // Default to comma delimiter
 	}
+}
+
+// WithDelimiter sets a custom delimiter for the CSV parser
+func (p *CSVParser) WithDelimiter(delimiter rune) *CSVParser {
+	p.delimiter = delimiter
+	return p
+}
+
+// detectDelimiter tries to automatically detect the delimiter used in the CSV file
+func (p *CSVParser) detectDelimiter(firstLine string) rune {
+	// Count occurrences of common delimiters
+	commaCount := strings.Count(firstLine, ",")
+	tabCount := strings.Count(firstLine, "\t")
+	semicolonCount := strings.Count(firstLine, ";")
+	
+	// Use the delimiter with the highest count
+	if tabCount > commaCount && tabCount > semicolonCount {
+		fmt.Println("Detected tab-delimited CSV")
+		return '\t'
+	} else if semicolonCount > commaCount && semicolonCount > tabCount {
+		fmt.Println("Detected semicolon-delimited CSV")
+		return ';'
+	}
+	
+	// Default to comma
+	fmt.Println("Detected comma-delimited CSV")
+	return ','
 }
 
 // Parse reads the CSV file and returns a slice of KanbanItem
@@ -29,11 +59,21 @@ func (p *CSVParser) Parse() ([]models.KanbanItem, error) {
 		return nil, fmt.Errorf("error opening file: %w", err)
 	}
 	defer file.Close()
-
+	
+	// Try to automatically detect the delimiter by reading the first line
+	scanner := bufio.NewScanner(file)
+	if scanner.Scan() {
+		firstLine := scanner.Text()
+		p.delimiter = p.detectDelimiter(firstLine)
+	}
+	
+	// Reset file pointer to beginning
+	file.Seek(0, 0)
+	
 	reader := csv.NewReader(file)
 	
-	// Set tab as delimiter since the example shows tab-separated data
-	reader.Comma = '\t'
+	// Set delimiter based on detection or user configuration
+	reader.Comma = p.delimiter
 	
 	// Disable field count checking as CSV might have inconsistent fields
 	reader.FieldsPerRecord = -1
@@ -50,6 +90,9 @@ func (p *CSVParser) Parse() ([]models.KanbanItem, error) {
 		colIndices[strings.TrimSpace(header)] = i
 	}
 
+	// Debug information about found columns
+	fmt.Println("Found columns:", strings.Join(headers, ", "))
+	
 	// Check that required columns exist
 	requiredCols := []string{"id", "name", "estimate", "is_completed", "completed_at"}
 	for _, col := range requiredCols {

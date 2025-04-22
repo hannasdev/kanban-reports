@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/yourusername/kanban-reports/internal/models"
+	"github.com/hannasdev/kanban-reports/internal/models"
 )
 
 // ReportType defines the type of report to generate

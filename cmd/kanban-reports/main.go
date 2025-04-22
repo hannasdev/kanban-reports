@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/yourusername/kanban-reports/internal/parser"
-	"github.com/yourusername/kanban-reports/internal/reports"
+	"github.com/hannasdev/kanban-reports/internal/parser"
+	"github.com/hannasdev/kanban-reports/internal/reports"
 )
 
 func main() {
@@ -18,6 +18,7 @@ func main() {
 	endDateStr := flag.String("end", "", "End date (YYYY-MM-DD)")
 	lastNDays := flag.Int("last", 0, "Generate report for the last N days")
 	outputPath := flag.String("output", "", "Path to save the report (optional)")
+	delimiterStr := flag.String("delimiter", "auto", "CSV delimiter: comma, tab, semicolon, or auto for automatic detection")
 
 	flag.Parse()
 
@@ -78,6 +79,21 @@ func main() {
 	// Parse CSV file
 	fmt.Println("Loading kanban data from:", *csvPath)
 	csvParser := parser.NewCSVParser(*csvPath)
+	
+	// Set delimiter if specified
+	switch *delimiterStr {
+	case "comma":
+		csvParser.WithDelimiter(',')
+	case "tab":
+		csvParser.WithDelimiter('\t')
+	case "semicolon":
+		csvParser.WithDelimiter(';')
+	case "auto":
+		// Auto-detection is the default
+	default:
+		fmt.Println("Invalid delimiter specified, using auto-detection")
+	}
+	
 	items, err := csvParser.Parse()
 	if err != nil {
 		fmt.Printf("Error parsing CSV: %v\n", err)
