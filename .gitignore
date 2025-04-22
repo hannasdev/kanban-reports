@@ -1,3 +1,4 @@
 /data
 /bin
 *.txt
+.DS_Store
