@@ -287,15 +287,38 @@ Month   | Items | Points | Avg Lead Time | Avg Cycle Time | Lead Time Δ | Cycle
 ```zsh
 kanban-reports/
 ├── cmd/
-│   └── kanban-reports/        # Main application entry point
+│   └── kanban-reports/         # Main application entry point
 │       └── main.go
 ├── internal/
-│   ├── models/                # Data models
+│   ├── config/                 # Application configuration
+│   │   └── config.go
+│   ├── models/                 # Data models
 │   │   └── kanban_item.go
-│   ├── parser/                # CSV parsing logic
+│   ├── parser/                 # CSV parsing logic
 │   │   └── csv_parser.go
-│   └── reports/               # Report generation
-│       └── reports.go
+│   ├── reports/                # Report generation
+│   │   ├── reporter.go         # Core reporter functionality
+│   │   ├── types.go            # Type definitions
+│   │   ├── contributor.go      # Contributor report implementation
+│   │   ├── epic.go             # Epic report implementation
+│   │   ├── product_area.go     # Product area report implementation
+│   │   └── team.go             # Team report implementation
+│   └── metrics/                # Metrics generation
+│       ├── metrics.go          # Core metrics generator
+│       ├── types.go            # Metrics type definitions
+│       ├── lead_time.go        # Lead time metrics
+│       ├── throughput.go       # Throughput metrics
+│       ├── flow.go             # Flow efficiency metrics
+│       ├── estimation.go       # Estimation accuracy metrics
+│       ├── age.go              # Work item age metrics
+│       ├── improvement.go      # Team improvement metrics
+│       └── util.go             # Common utility functions for metrics
+├── pkg/                        # Reusable public packages
+│   └── dateutil/               # Date handling utilities
+│       └── dateutil.go
+├── test/                       # Test data and helpers
+│   └── fixtures/               # Test fixture files
+│       └── sample.csv
 ├── data/                      # Place your CSV files here
 │   └── kanban-data.csv
 ├── go.mod
@@ -304,14 +327,43 @@ kanban-reports/
 
 ## Development
 
+### Testing the Application
+
+Run the unit tests to ensure everything is working properly:
+
+```bash
+# Run all unit tests
+go test ./internal/...
+
+# Run tests for a specific package
+go test ./internal/reports/...
+
+# Run with verbose output
+go test -v ./internal/...
+
+# Run with test coverage report
+go test -cover ./internal/...
+```
+
 ### Adding New Report Types
 
 To add a new report type:
 
-1. Add a new report type constant in `internal/reports/reports.go`
-2. Add a new report generation function in the Reporter struct
-3. Update the switch statement in `GenerateReport` to handle the new type
-4. Update the main.go to accept the new report type as a command-line option
+1. Add a new report type constant in `internal/reports/types.go`
+2. Create a new file in `internal/reports/` for your report implementation
+3. Add a new report generation function in the Reporter struct
+4. Update the switch statement in `GenerateReport` to handle the new type
+5. Update `cmd/kanban-reports/main.go` to accept the new report type as a command-line option
+
+### Adding New Metrics
+
+To add a new metrics type:
+
+1. Add a new metrics type constant in `internal/metrics/types.go`
+2. Create a new file in `internal/metrics/` for your metrics implementation
+3. Add a new metrics generation function
+4. Update the switch statement in `Generator.Generate()` to handle the new type
+5. Update `cmd/kanban-reports/main.go` to accept the new metrics type as a command-line option
 
 ### Modifying the CSV Parser
 
@@ -334,3 +386,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+When contributing:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/new-metric`)
+3. Commit your changes (`git commit -am 'Add new metric type'`)
+4. Push to the branch (`git push origin feature/new-metric`)
+5. Create a new Pull Request
+
+Please make sure to update tests as appropriate and follow the modular code structure.
