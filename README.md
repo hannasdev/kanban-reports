@@ -110,22 +110,6 @@ id,name,type,requester,owners,description,is_completed,created_at,started_at,upd
 
 ## Report Types
 
-### Contributor Report
-
-Shows story points completed by each contributor (owner). Points are divided equally if multiple owners are assigned to an item.
-
-Example output:
-
-```zsh
-Story Points by Contributor:
-
-john.smith@example.com          15.0 points   5 items
-jane.doe@example.com            12.5 points   4 items
-Unassigned                       5.0 points   2 items
-
-Total: 32.5 points across 11 items
-```
-
 ### Epic Report
 
 Shows story points completed by epic.
