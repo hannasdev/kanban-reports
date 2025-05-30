@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hannasdev/kanban-reports/internal/models"
-	"github.com/hannasdev/kanban-reports/internal/reports"
+	"github.com/hannasdev/kanban-reports/pkg/types"
 )
 
 func TestNewGenerator(t *testing.T) {
@@ -25,7 +25,7 @@ func TestNewGenerator(t *testing.T) {
 		t.Errorf("Expected 1 item, got %d", len(generator.items))
 	}
 	
-	if generator.adHocFilter != reports.AdHocFilterInclude {
+	if generator.adHocFilter != types.AdHocFilterInclude {
 		t.Errorf("Expected default adHocFilter to be AdHocFilterInclude, got %v", generator.adHocFilter)
 	}
 }
@@ -34,10 +34,10 @@ func TestWithAdHocFilter(t *testing.T) {
 	generator := NewGenerator(nil)
 	
 	// Test each filter type
-	filters := []reports.AdHocFilterType{
-		reports.AdHocFilterInclude,
-		reports.AdHocFilterExclude,
-		reports.AdHocFilterOnly,
+	filters := []types.AdHocFilterType{
+		types.AdHocFilterInclude,
+		types.AdHocFilterExclude,
+		types.AdHocFilterOnly,
 	}
 	
 	for _, filter := range filters {
@@ -121,7 +121,7 @@ func TestFilterItemsByDateRange(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filtered := generator.filterItemsByDateRange(tt.startDate, tt.endDate)
+			filtered := generator.filterItemsByDateRange(tt.startDate, tt.endDate,  models.FilterFieldCompletedAt)
 			if len(filtered) != tt.expected {
 				t.Errorf("filterItemsByDateRange() returned %d items, expected %d", len(filtered), tt.expected)
 			}
@@ -197,7 +197,7 @@ func TestGenerate(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			report, err := generator.Generate(tt.metricsType, tt.periodType, time.Time{}, time.Time{})
+			report, err := generator.Generate(tt.metricsType, tt.periodType, time.Time{}, time.Time{}, models.FilterFieldCompletedAt)
 			if err != nil {
 				t.Fatalf("Generate() error = %v", err)
 			}
@@ -223,7 +223,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 		periodType PeriodType
 		startDate  time.Time
 		endDate    time.Time
-		adHocFilter reports.AdHocFilterType
+		adHocFilter types.AdHocFilterType
 		expected   []string
 	}{
 		{
@@ -232,7 +232,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			periodType: PeriodTypeMonth,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: reports.AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Metrics Type: lead-time",
 				"Period Type: month",
@@ -246,7 +246,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			periodType: PeriodTypeWeek,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Time{},
-			adHocFilter: reports.AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Metrics Type: throughput",
 				"Period Type: week",
@@ -260,7 +260,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			periodType: PeriodTypeMonth,
 			startDate:  time.Time{},
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: reports.AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Metrics Type: flow",
 				"Period Type: month",
@@ -274,7 +274,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			periodType: PeriodTypeMonth,
 			startDate:  time.Time{},
 			endDate:    time.Time{},
-			adHocFilter: reports.AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Metrics Type: estimation",
 				"Period Type: month",
@@ -288,7 +288,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			periodType: PeriodTypeMonth,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: reports.AdHocFilterExclude,
+			adHocFilter: types.AdHocFilterExclude,
 			expected:   []string{
 				"Metrics Type: lead-time",
 				"Period Type: month",
@@ -303,7 +303,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			periodType: PeriodTypeMonth,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: reports.AdHocFilterOnly,
+			adHocFilter: types.AdHocFilterOnly,
 			expected:   []string{
 				"Metrics Type: lead-time",
 				"Period Type: month",

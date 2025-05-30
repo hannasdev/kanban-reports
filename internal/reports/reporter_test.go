@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hannasdev/kanban-reports/internal/models"
+	"github.com/hannasdev/kanban-reports/pkg/types"
 )
 
 func TestNewReporter(t *testing.T) {
@@ -23,7 +24,7 @@ func TestNewReporter(t *testing.T) {
 		t.Errorf("Expected 1 item, got %d", len(reporter.items))
 	}
 	
-	if reporter.adHocFilter != AdHocFilterInclude {
+	if reporter.adHocFilter != types.AdHocFilterInclude {
 		t.Errorf("Expected default adHocFilter to be AdHocFilterInclude, got %v", reporter.adHocFilter)
 	}
 }
@@ -32,10 +33,10 @@ func TestWithAdHocFilter(t *testing.T) {
 	reporter := NewReporter(nil)
 	
 	// Test each filter type
-	filters := []AdHocFilterType{
-		AdHocFilterInclude,
-		AdHocFilterExclude,
-		AdHocFilterOnly,
+	filters := []types.AdHocFilterType{
+		types.AdHocFilterInclude,
+		types.AdHocFilterExclude,
+		types.AdHocFilterOnly,
 	}
 	
 	for _, filter := range filters {
@@ -119,7 +120,7 @@ func TestFilterItemsByDateRange(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filtered := reporter.filterItemsByDateRange(tt.startDate, tt.endDate)
+			filtered := reporter.filterItemsByDateRange(tt.startDate, tt.endDate, models.FilterFieldCompletedAt)
 			if len(filtered) != tt.expected {
 				t.Errorf("filterItemsByDateRange() returned %d items, expected %d", len(filtered), tt.expected)
 			}
@@ -238,7 +239,7 @@ func TestGenerateReport(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			report, err := reporter.GenerateReport(tt.reportType, time.Time{}, time.Time{})
+			report, err := reporter.GenerateReport(tt.reportType, time.Time{}, time.Time{}, models.FilterFieldCompletedAt)
 			if err != nil {
 				t.Fatalf("GenerateReport() error = %v", err)
 			}
@@ -252,7 +253,7 @@ func TestGenerateReport(t *testing.T) {
 	}
 	
 	// Test invalid report type
-	_, err := reporter.GenerateReport("invalid-type", time.Time{}, time.Time{})
+	_, err := reporter.GenerateReport("invalid-type", time.Time{}, time.Time{}, models.FilterFieldCompletedAt)
 	if err == nil {
 		t.Errorf("GenerateReport() with invalid type should return error")
 	}
@@ -269,7 +270,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 		reportType ReportType
 		startDate  time.Time
 		endDate    time.Time
-		adHocFilter AdHocFilterType
+		adHocFilter types.AdHocFilterType
 		expected   []string
 	}{
 		{
@@ -277,7 +278,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			reportType: ReportTypeContributor,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Report Type: contributor",
 				"Date Range: 2024-05-01 to 2024-05-31",
@@ -289,7 +290,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			reportType: ReportTypeEpic,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Time{},
-			adHocFilter: AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Report Type: epic",
 				"From: 2024-05-01",
@@ -301,7 +302,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			reportType: ReportTypeTeam,
 			startDate:  time.Time{},
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Report Type: team",
 				"To: 2024-05-31",
@@ -313,7 +314,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			reportType: ReportTypeProductArea,
 			startDate:  time.Time{},
 			endDate:    time.Time{},
-			adHocFilter: AdHocFilterInclude,
+			adHocFilter: types.AdHocFilterInclude,
 			expected:   []string{
 				"Report Type: product-area",
 				"Date Range: All Time",
@@ -325,7 +326,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			reportType: ReportTypeContributor,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: AdHocFilterExclude,
+			adHocFilter: types.AdHocFilterExclude,
 			expected:   []string{
 				"Report Type: contributor",
 				"Date Range: 2024-05-01 to 2024-05-31",
@@ -338,7 +339,7 @@ func TestAddDateRangeInfo(t *testing.T) {
 			reportType: ReportTypeContributor,
 			startDate:  time.Date(2024, 5, 1, 0, 0, 0, 0, time.UTC),
 			endDate:    time.Date(2024, 5, 31, 0, 0, 0, 0, time.UTC),
-			adHocFilter: AdHocFilterOnly,
+			adHocFilter: types.AdHocFilterOnly,
 			expected:   []string{
 				"Report Type: contributor",
 				"Date Range: 2024-05-01 to 2024-05-31",
@@ -396,7 +397,7 @@ func TestGenerateReportWithDateRange(t *testing.T) {
 	startDate := now.AddDate(0, 0, -7) // 7 days ago
 	endDate := now
 	
-	report, err := reporter.GenerateReport(ReportTypeContributor, startDate, endDate)
+	report, err := reporter.GenerateReport(ReportTypeContributor, startDate, endDate, models.FilterFieldCompletedAt)
 	if err != nil {
 		t.Fatalf("GenerateReport() error = %v", err)
 	}

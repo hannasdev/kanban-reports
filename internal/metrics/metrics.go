@@ -6,55 +6,66 @@ import (
 	"time"
 
 	"github.com/hannasdev/kanban-reports/internal/models"
-	"github.com/hannasdev/kanban-reports/internal/reports"
+	"github.com/hannasdev/kanban-reports/pkg/types"
 )
 
 // Generator handles the generation of metrics
 type Generator struct {
 	items       []models.KanbanItem
-	adHocFilter reports.AdHocFilterType
+	adHocFilter types.AdHocFilterType
 }
 
 // NewGenerator creates a new metrics generator
 func NewGenerator(items []models.KanbanItem) *Generator {
 	return &Generator{
 		items:       items,
-		adHocFilter: reports.AdHocFilterInclude,
+		adHocFilter: types.AdHocFilterInclude,
 	}
 }
 
 // WithAdHocFilter sets the ad-hoc request filter
-func (g *Generator) WithAdHocFilter(filter reports.AdHocFilterType) *Generator {
+func (g *Generator) WithAdHocFilter(filter types.AdHocFilterType) *Generator {
 	g.adHocFilter = filter
 	return g
 }
 
 // filterItemsByDateRange returns items completed within the given date range
-func (g *Generator) filterItemsByDateRange(startDate, endDate time.Time) []models.KanbanItem {
+func (g *Generator) filterItemsByDateRange(startDate, endDate time.Time, filterField models.FilterField) []models.KanbanItem {
 	var filtered []models.KanbanItem
 	
 	for _, item := range g.items {
-		// Only include completed items
-		if !item.IsCompleted || item.CompletedAt.IsZero() {
-			continue
+		// Get the appropriate date field using the FilterField's method
+		itemDate, hasDate := filterField.GetItemDate(item)
+		
+		// Skip items with no date in the requested field
+		if !hasDate {
+				continue
 		}
 		
-		// Check if completion date is within range
-		if (startDate.IsZero() || !item.CompletedAt.Before(startDate)) &&
-		   (endDate.IsZero() || !item.CompletedAt.After(endDate)) {
-			
-			// Apply ad-hoc request filter
-			isAdHoc := g.isAdHocRequest(item)
-			
-			if (g.adHocFilter == reports.AdHocFilterInclude) ||
-			   (g.adHocFilter == reports.AdHocFilterExclude && !isAdHoc) ||
-			   (g.adHocFilter == reports.AdHocFilterOnly && isAdHoc) {
-				filtered = append(filtered, item)
-			}
+		// Check if date is within range
+		if (startDate.IsZero() || !itemDate.Before(startDate)) &&
+			 (endDate.IsZero() || !itemDate.After(endDate)) {
+				
+				// Apply ad-hoc request filter
+				isAdHoc := g.isAdHocRequest(item)
+				
+				// Use the same switch approach for consistency
+				switch g.adHocFilter {
+				case types.AdHocFilterInclude:
+						filtered = append(filtered, item)
+				case types.AdHocFilterExclude:
+						if !isAdHoc {
+								filtered = append(filtered, item)
+						}
+				case types.AdHocFilterOnly:
+						if isAdHoc {
+								filtered = append(filtered, item)
+						}
+				}
 		}
-	}
-	
-	return filtered
+}
+
+return filtered
 }
 
 // isAdHocRequest checks if an item is an ad-hoc request (has "ad-hoc-request" label)
@@ -97,9 +108,9 @@ func (g *Generator) addDateRangeInfo(report string, metricsType MetricsType, per
 	
 	// Add ad-hoc filtering information
 	switch g.adHocFilter {
-	case reports.AdHocFilterExclude:
+	case types.AdHocFilterExclude:
 		header += "Filter: Excluding ad-hoc requests\n\n"
-	case reports.AdHocFilterOnly:
+	case types.AdHocFilterOnly:
 		header += "Filter: Only ad-hoc requests\n\n"
 	}
 	
@@ -107,10 +118,10 @@ func (g *Generator) addDateRangeInfo(report string, metricsType MetricsType, per
 }
 
 // Generate generates metrics based on the specified type and time period
-func (g *Generator) Generate(metricsType MetricsType, periodType PeriodType, startDate, endDate time.Time) (string, error) {
-	// Filter items by completion date within range
-	filteredItems := g.filterItemsByDateRange(startDate, endDate)
-	
+func (g *Generator) Generate(metricsType MetricsType, periodType PeriodType, startDate, endDate time.Time, filterField models.FilterField) (string, error) {
+	// Filter items by date within range using the FilterField
+	filteredItems := g.filterItemsByDateRange(startDate, endDate, filterField)
+ 
 	if len(filteredItems) == 0 {
 		return "No items completed in the specified date range.", nil
 	}

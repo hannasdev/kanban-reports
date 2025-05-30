@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -122,7 +123,7 @@ func ParseExternalTickets(ticketsStr string) []string {
 	}
 	
 	// If empty or not JSON format, return empty slice
-	if ticketsStr == "" || !strings.HasPrefix(ticketsStr, "{") {
+	if ticketsStr == "" || !strings.HasPrefix(ticketsStr, "{") || !strings.HasSuffix(ticketsStr, "}") {
 		return []string{}
 	}
 	
@@ -135,7 +136,9 @@ func ParseExternalTickets(ticketsStr string) []string {
 	// Extract keys as ticket IDs/URLs
 	result := make([]string, 0, len(tickets))
 	for key := range tickets {
-		result = append(result, key)
+		if key != "" { 
+			result = append(result, key)
+		}
 	}
 	
 	return result
@@ -144,26 +147,28 @@ func ParseExternalTickets(ticketsStr string) []string {
 // ParseOwners splits owner string into individual owners
 func ParseOwners(ownersStr string) []string {
 	if ownersStr == "" {
-		return []string{}
+			return []string{}
 	}
 	
-	// Split by comma, semicolon, or space as potential separators
-	separators := []string{",", ";", " "}
-	var owners []string
+	// Split using regex
+	re := regexp.MustCompile(`[,;\s]+`)
+	candidates := re.Split(ownersStr, -1)
 	
-	for _, sep := range separators {
-		if strings.Contains(ownersStr, sep) {
-			owners = strings.Split(ownersStr, sep)
-			// Trim any whitespace
-			for i, owner := range owners {
-				owners[i] = strings.TrimSpace(owner)
+	// Filter valid owners
+	var validOwners []string
+	for _, candidate := range candidates {
+			trimmed := strings.TrimSpace(candidate)
+			if trimmed != "" {
+					validOwners = append(validOwners, trimmed)
 			}
-			return owners
-		}
 	}
 	
-	// If no separator found, treat as single owner
-	return []string{ownersStr}
+	// Return valid owners or original as fallback
+	if len(validOwners) > 0 {
+			return validOwners
+	}
+	
+	return []string{strings.TrimSpace(ownersStr)}
 }
 
 // ParseCustomFields processes custom fields string

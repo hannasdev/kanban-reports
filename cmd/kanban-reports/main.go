@@ -22,15 +22,13 @@ func main() {
 	fmt.Println("Loading kanban data from:", cfg.CSVPath)
 	csvParser := parser.NewCSVParser(cfg.CSVPath)
 	
-	// Set delimiter if auto-detection is disabled
-	if !cfg.AutoDetect {
-		csvParser.WithDelimiter(cfg.Delimiter)
-	}
+	// Set delimiter from config
+	csvParser.WithDelimiter(cfg.Delimiter)
 	
 	items, err := csvParser.Parse()
 	if err != nil {
-		fmt.Printf("Error parsing CSV: %v\n", err)
-		os.Exit(1)
+			fmt.Printf("Error parsing CSV: %v\n", err)
+			os.Exit(1)
 	}
 
 	fmt.Printf("Loaded %d kanban items\n", len(items))
@@ -44,20 +42,20 @@ func main() {
 		// Generate metrics using the metrics package
 		metricsGenerator := metrics.NewGenerator(items)
 		metricsGenerator.WithAdHocFilter(cfg.AdHocFilter)
-		
+
 		startDate, endDate := cfg.GetDateRange()
-		outputContent, err = metricsGenerator.Generate(cfg.MetricsType, cfg.PeriodType, startDate, endDate)
+		outputContent, err = metricsGenerator.Generate(cfg.MetricsType, cfg.PeriodType, startDate, endDate, cfg.FilterField)
 		if err != nil {
-			fmt.Printf("Error generating metrics: %v\n", err)
-			os.Exit(1)
+				fmt.Printf("Error generating metrics: %v\n", err)
+				os.Exit(1)
 		}
 	} else {
 		// Generate regular report using the reports package
 		reporter := reports.NewReporter(items)
 		reporter.WithAdHocFilter(cfg.AdHocFilter)
-		
+
 		startDate, endDate := cfg.GetDateRange()
-		outputContent, err = reporter.GenerateReport(cfg.ReportType, startDate, endDate)
+		outputContent, err = reporter.GenerateReport(cfg.ReportType, startDate, endDate, cfg.FilterField)
 		if err != nil {
 			fmt.Printf("Error generating report: %v\n", err)
 			os.Exit(1)
