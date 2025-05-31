@@ -3,6 +3,7 @@ package parser
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/hannasdev/kanban-reports/internal/models"
@@ -245,5 +246,323 @@ func TestParseRow(t *testing.T) {
 	completedAt, _ := models.ParseTime("2024/05/07 14:00:00")
 	if !item.CompletedAt.Equal(completedAt) {
 		t.Errorf("CompletedAt = %v, want %v", item.CompletedAt, completedAt)
+	}
+}
+
+func TestCSVParser_FileErrors(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFile   func() string // Returns file path
+		expectError bool
+		errorType   string
+	}{
+		{
+			name: "Nonexistent file",
+			setupFile: func() string {
+				return "/nonexistent/path/file.csv"
+			},
+			expectError: true,
+			errorType:   "error opening file",
+		},
+		{
+			name: "Empty file",
+			setupFile: func() string {
+				tempFile, _ := os.CreateTemp("", "empty-*.csv")
+				tempFile.Close()
+				return tempFile.Name()
+			},
+			expectError: true,
+			errorType:   "error reading CSV header",
+		},
+		{
+			name: "File with only whitespace",
+			setupFile: func() string {
+					tempFile, _ := os.CreateTemp("", "whitespace-*.csv")
+					tempFile.WriteString("   \n  \n  ")
+					tempFile.Close()
+					return tempFile.Name()
+			},
+			expectError: true,
+			errorType:   "required column", // Actual error when headers are whitespace
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := tt.setupFile()
+			defer os.Remove(filePath) // Clean up
+
+			parser := NewCSVParser(filePath)
+			_, err := parser.Parse()
+
+			if (err != nil) != tt.expectError {
+				t.Errorf("Expected error: %v, got: %v", tt.expectError, err != nil)
+			}
+
+			if tt.expectError && err != nil {
+				if !strings.Contains(err.Error(), tt.errorType) {
+					t.Errorf("Expected error containing '%s', got: %s", tt.errorType, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestCSVParser_InvalidCSVStructure(t *testing.T) {
+	tests := []struct {
+		name        string
+		csvContent  string
+		expectError bool
+		description string
+	}{
+		{
+			name: "Missing required columns",
+			csvContent: `name,description,owners
+Task 1,Description 1,john@example.com
+Task 2,Description 2,jane@example.com`,
+			expectError: true,
+			description: "Should fail when required columns (id, estimate, is_completed, completed_at) are missing",
+		},
+		{
+			name: "Headers only, no data rows",
+			csvContent: `id,name,estimate,is_completed,completed_at`,
+			expectError: false,
+			description: "Should return empty slice when no data rows present",
+		},
+		{
+			name: "Inconsistent field counts per row",
+			csvContent: `id,name,estimate,is_completed,completed_at
+1,Task 1,3,TRUE,2024/05/01 10:00:00
+2,Task 2,2,FALSE
+3,Task 3,5,TRUE,2024/05/03 10:00:00,extra,field`,
+			expectError: false,
+			description: "Should handle inconsistent field counts gracefully (CSV parser allows this)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp file with test content
+			tempFile, err := os.CreateTemp("", "csv-test-*.csv")
+			if err != nil {
+				t.Fatalf("Failed to create temp file: %v", err)
+			}
+			defer os.Remove(tempFile.Name())
+
+			if _, err := tempFile.WriteString(tt.csvContent); err != nil {
+				t.Fatalf("Failed to write test content: %v", err)
+			}
+			tempFile.Close()
+
+			// Test parsing
+			parser := NewCSVParser(tempFile.Name())
+			items, err := parser.Parse()
+
+			if (err != nil) != tt.expectError {
+				t.Errorf("%s: Expected error: %v, got: %v", tt.description, tt.expectError, err != nil)
+			}
+
+			if !tt.expectError && len(items) == 0 && tt.name != "Headers only, no data rows" {
+				t.Errorf("%s: Expected items but got empty slice", tt.description)
+			}
+		})
+	}
+}
+
+func TestCSVParser_DataTypeHandling(t *testing.T) {
+	tests := []struct {
+		name       string
+		csvContent string
+		itemIndex  int
+		validate   func(models.KanbanItem) bool
+	}{
+		{
+			name: "Invalid date formats",
+			csvContent: `id,name,estimate,is_completed,completed_at,created_at,started_at
+1,Task 1,3,TRUE,invalid-date,2024/05/01 10:00:00,2024/05/02 10:00:00
+2,Task 2,2,FALSE,,2024/05/01 10:00:00,`,
+			itemIndex: 0,
+			validate: func(item models.KanbanItem) bool {
+				// Invalid date should result in zero time
+				return item.CompletedAt.IsZero() && !item.CreatedAt.IsZero()
+			},
+		},
+		{
+			name: "Invalid boolean values",
+			csvContent: `id,name,estimate,is_completed,completed_at,is_blocked,is_a_blocker
+1,Task 1,3,maybe,2024/05/01 10:00:00,yes,no
+2,Task 2,2,1,2024/05/02 10:00:00,0,1`,
+			itemIndex: 0,
+			validate: func(item models.KanbanItem) bool {
+				// Invalid boolean should default to false
+				return !item.IsCompleted && !item.IsBlocked && !item.IsABlocker
+			},
+		},
+		{
+			name: "Invalid numeric values",
+			csvContent: `id,name,estimate,is_completed,completed_at,external_ticket_count
+1,Task 1,not-a-number,TRUE,2024/05/01 10:00:00,also-not-a-number
+2,Task 2,,FALSE,2024/05/02 10:00:00,`,
+			itemIndex: 0,
+			validate: func(item models.KanbanItem) bool {
+				// Invalid numbers should default to 0
+				return item.Estimate == 0 && item.ExternalTicketCount == 0
+			},
+		},
+		{
+			name: "Complex external tickets JSON",
+			csvContent: `id,name,estimate,is_completed,completed_at,external_tickets
+	1,Task 1,3,TRUE,2024/05/01 10:00:00,"#{""JIRA-123"":1,""GITHUB-456"":1}"
+	2,Task 2,2,FALSE,2024/05/02 10:00:00,invalid-json`,
+			itemIndex: 0,
+			validate: func(item models.KanbanItem) bool {
+					// Should parse valid JSON tickets
+					return len(item.ExternalTickets) == 2
+			},
+		},
+		{
+			name: "Various owner formats",
+			csvContent: `id,name,estimate,is_completed,completed_at,owners
+1,Task 1,3,TRUE,2024/05/01 10:00:00,"john@example.com, jane@example.com"
+2,Task 2,2,FALSE,2024/05/02 10:00:00,bob@example.com;alice@example.com
+3,Task 3,1,TRUE,2024/05/03 10:00:00,   spaced@example.com   `,
+			itemIndex: 0,
+			validate: func(item models.KanbanItem) bool {
+				// Should handle comma-separated owners correctly
+				return len(item.Owners) >= 2
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp file with test content
+			tempFile, err := os.CreateTemp("", "csv-datatype-*.csv")
+			if err != nil {
+				t.Fatalf("Failed to create temp file: %v", err)
+			}
+			defer os.Remove(tempFile.Name())
+
+			if _, err := tempFile.WriteString(tt.csvContent); err != nil {
+				t.Fatalf("Failed to write test content: %v", err)
+			}
+			tempFile.Close()
+
+			// Test parsing
+			parser := NewCSVParser(tempFile.Name())
+			items, err := parser.Parse()
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if len(items) <= tt.itemIndex {
+				t.Fatalf("Expected at least %d items, got %d", tt.itemIndex+1, len(items))
+			}
+
+			if !tt.validate(items[tt.itemIndex]) {
+				t.Errorf("Validation failed for item at index %d", tt.itemIndex)
+			}
+		})
+	}
+}
+
+func TestCSVParser_DelimiterHandling(t *testing.T) {
+	tests := []struct {
+		name       string
+		csvContent string
+		delimiter  models.DelimiterType
+		expectRows int
+	}{
+		{
+			name:       "Tab delimited with auto detection",
+			csvContent: "id\tname\testimate\tis_completed\tcompleted_at\n1\tTask 1\t3\tTRUE\t2024/05/01 10:00:00",
+			delimiter:  models.DelimiterAuto,
+			expectRows: 1,
+		},
+		{
+			name:       "Semicolon delimited with explicit setting",
+			csvContent: "id;name;estimate;is_completed;completed_at\n1;Task 1;3;TRUE;2024/05/01 10:00:00",
+			delimiter:  models.DelimiterSemicolon,
+			expectRows: 1,
+		},
+		{
+			name:       "Comma delimited content",
+			csvContent: "id,name,estimate,is_completed,completed_at\n1,Task 1,3,TRUE,2024/05/01 10:00:00",
+			delimiter:  models.DelimiterAuto,
+			expectRows: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp file with test content
+			tempFile, err := os.CreateTemp("", "csv-delimiter-*.csv")
+			if err != nil {
+				t.Fatalf("Failed to create temp file: %v", err)
+			}
+			defer os.Remove(tempFile.Name())
+
+			if _, err := tempFile.WriteString(tt.csvContent); err != nil {
+				t.Fatalf("Failed to write test content: %v", err)
+			}
+			tempFile.Close()
+
+			// Test parsing with specified delimiter
+			parser := NewCSVParser(tempFile.Name()).WithDelimiter(tt.delimiter)
+			items, err := parser.Parse()
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if len(items) != tt.expectRows {
+				t.Errorf("Expected %d rows, got %d", tt.expectRows, len(items))
+			}
+		})
+	}
+}
+
+func TestCSVParser_ErrorRecovery(t *testing.T) {
+	// Test that parser continues processing even when some rows have errors
+	csvContent := `id,name,estimate,is_completed,completed_at
+1,Task 1,3,TRUE,2024/05/01 10:00:00
+,Task 2,2,FALSE,2024/05/02 10:00:00
+3,Task 3,invalid-estimate,TRUE,invalid-date
+4,Task 4,1,TRUE,2024/05/04 10:00:00`
+
+	tempFile, err := os.CreateTemp("", "csv-recovery-*.csv")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	if _, err := tempFile.WriteString(csvContent); err != nil {
+		t.Fatalf("Failed to write test content: %v", err)
+	}
+	tempFile.Close()
+
+	parser := NewCSVParser(tempFile.Name())
+	items, err := parser.Parse()
+
+	if err != nil {
+		t.Fatalf("Expected parser to recover from row errors, got: %v", err)
+	}
+
+	// Should have successfully parsed some rows despite errors in others
+	if len(items) == 0 {
+		t.Errorf("Expected some successfully parsed items despite row errors")
+	}
+
+	// Verify that valid rows were parsed correctly
+	validItems := 0
+	for _, item := range items {
+		if item.ID != "" && item.Name != "" {
+			validItems++
+		}
+	}
+
+	if validItems == 0 {
+		t.Errorf("Expected at least some valid items to be parsed")
 	}
 }
