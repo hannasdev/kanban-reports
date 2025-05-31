@@ -22,6 +22,32 @@ A Go application for generating reports from Kanban board data exported as CSV. 
 - Save reports to file or view in console
 - Automatic CSV delimiter detection (comma, tab, semicolon)
 
+## Quick Start
+
+### Option 1: Interactive Mode (Recommended for beginners)
+
+#### Build and run setup
+
+./scripts/setup.sh
+
+#### Start interactive mode
+
+./bin/kanban-reports --interactive
+
+### Option 2: Command Line Mode
+
+#### Show all available options
+
+./bin/kanban-reports --help
+
+#### See practical examples
+
+./bin/kanban-reports --examples
+
+#### Quick start with sample data
+
+./bin/kanban-reports --csv data/sample.csv --type contributor --last 30
+
 ## Installation
 
 ### Prerequisites
@@ -73,6 +99,10 @@ go build -o bin/kanban-reports ./cmd/kanban-reports
 
 | Flag | Description | Example |
 |------|-------------|---------|
+| `--help, -h` | Complete help with all options | `./bin/kanban-reports --help` |
+| `--examples` | Practical usage examples | `./bin/kanban-reports --examples` |
+| `--version` | Version information | `./bin/kanban-reports --version` |
+| `--interactive, -i` | Interactive menu mode | `./bin/kanban-reports` |
 | `--csv` | Path to the kanban CSV file (required) | `--csv data/kanban-data.csv` |
 | `--type` | Type of report to generate (contributor, epic, product-area, team) | `--type epic` |
 | `--metrics` | Type of metrics to generate (lead-time, throughput, flow, estimation, age, improvement, all) | `--metrics lead-time` |

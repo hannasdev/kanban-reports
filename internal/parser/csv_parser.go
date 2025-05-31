@@ -34,7 +34,17 @@ func (p *CSVParser) WithDelimiter(delimiter models.DelimiterType) *CSVParser {
 func (p *CSVParser) Parse() ([]models.KanbanItem, error) {
 	file, err := os.Open(p.filepath)
 	if err != nil {
-			return nil, fmt.Errorf("error opening file: %w", err)
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("CSV file '%s' does not exist", p.filepath)
+		}
+		if os.IsPermission(err) {
+			return nil, fmt.Errorf("permission denied accessing CSV file '%s'", p.filepath)
+		}
+		// Check if it's a directory
+		if info, statErr := os.Stat(p.filepath); statErr == nil && info.IsDir() {
+			return nil, fmt.Errorf("'%s' is a directory, not a file. Please specify a CSV file path", p.filepath)
+		}
+		return nil, fmt.Errorf("error opening CSV file '%s': %w", p.filepath, err)
 	}
 	defer file.Close()
 	
