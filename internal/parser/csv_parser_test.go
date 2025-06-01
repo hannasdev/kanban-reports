@@ -262,7 +262,7 @@ func TestCSVParser_FileErrors(t *testing.T) {
 				return "/nonexistent/path/file.csv"
 			},
 			expectError: true,
-			errorType:   "error opening file",
+			errorType:   "does not exist", // Updated to match new error message
 		},
 		{
 			name: "Empty file",
