@@ -268,6 +268,9 @@ DESCRIPTION:
     Generate insightful reports and metrics from your Kanban board CSV exports.
     Track team productivity, analyze flow efficiency, and identify improvement opportunities.
 
+QUICK EXIT:
+    Type 'q', 'quit', 'exit', or 'bye' at any prompt to exit gracefully.
+
 USAGE:
     %s [OPTIONS]                    # Command-line mode
     %s --interactive                # Interactive menu mode
@@ -402,8 +405,8 @@ ADVANCED WORKFLOWS:
     %s --csv kanban-data.csv --metrics improvement --output monthly-trends.txt
 
     # Analyze different time periods
-    %s --csv kanban-data.csv --metrics lead-time --start 2024-01-01 --end 2024-02-29  # Q1
-    %s --csv kanban-data.csv --metrics lead-time --start 2024-03-01 --end 2024-05-31  # Q2
+    %s --csv kanban-data.csv --metrics lead-time --start 2024-01-01 --end 2024-02-29
+    %s --csv kanban-data.csv --metrics lead-time --start 2024-03-01 --end 2024-05-31
 
     # Compare planned vs ad-hoc work
     %s --csv kanban-data.csv --type contributor --last 30 --ad-hoc exclude --output planned.txt
@@ -444,9 +447,12 @@ COMMON WORKFLOWS:
 
 Need help? Run: %s --help
 
-`, os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
-os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
-os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
+`, 
+		// Now provide exactly 24 arguments to match the 24 %s placeholders
+		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
+		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
+		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
+		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
 }
 
 // Helper functions for system information
