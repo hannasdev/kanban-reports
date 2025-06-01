@@ -28,25 +28,25 @@ A Go application for generating reports from Kanban board data exported as CSV. 
 
 #### Build and run setup
 
-./scripts/setup.sh
+`./scripts/setup.sh`
 
 #### Start interactive mode
 
-./bin/kanban-reports --interactive
+`./bin/kanban-reports --interactive`
 
 ### Option 2: Command Line Mode
 
 #### Show all available options
 
-./bin/kanban-reports --help
+`./bin/kanban-reports --help`
 
 #### See practical examples
 
-./bin/kanban-reports --examples
+`./bin/kanban-reports --examples`
 
 #### Quick start with sample data
 
-./bin/kanban-reports --csv data/sample.csv --type contributor --last 30
+`./bin/kanban-reports --csv data/sample.csv --type contributor --last 30`
 
 ## Installation
 
