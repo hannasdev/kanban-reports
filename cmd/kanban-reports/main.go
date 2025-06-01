@@ -30,6 +30,11 @@ func main() {
 		menuSystem := menu.NewMenu()
 		cfg, err = menuSystem.Run()
 		if err != nil {
+			// Check if it's a quit error
+			if quitErr, ok := err.(menu.QuitError); ok {
+				fmt.Printf("\n👋 %s. Goodbye!\n", quitErr.Message)
+				os.Exit(0)
+			}
 			fmt.Printf("❌ Error: %v\n", err)
 			os.Exit(1)
 		}
