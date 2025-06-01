@@ -222,30 +222,30 @@ func setDelimiter(config *Config, delimiterStr string) error {
 	return nil
 }
 
-// setReportAndMetricsTypes validates that exactly one of report type or metrics type is specified
+// setReportAndMetricsTypes validates and sets report/metrics types with proper precedence
 func setReportAndMetricsTypes(config *Config, reportType, metricsType string) error {
 	if metricsType == "" && reportType == "" {
 		return fmt.Errorf("either --type or --metrics must be specified")
 	}
 
-	if metricsType != "" && reportType != "" {
-		return fmt.Errorf("cannot specify both --type and --metrics")
-	}
-
-	if reportType != "" {
-		rt, err := reports.ParseReportType(reportType)
-		if err != nil {
-			return fmt.Errorf("%v\n\nAvailable report types: contributor, epic, product-area, team", err)
-		}
-		config.ReportType = rt
-	}
-
+	// Metrics type takes precedence when both are specified (original behavior)
 	if metricsType != "" {
 		mt, err := metrics.ParseMetricsType(metricsType)
 		if err != nil {
 			return fmt.Errorf("%v\n\nAvailable metrics types: lead-time, throughput, flow, estimation, age, improvement, all", err)
 		}
 		config.MetricsType = mt
+		return nil
+	}
+
+	// Only parse report type if metrics type is not specified
+	if reportType != "" {
+		rt, err := reports.ParseReportType(reportType)
+		if err != nil {
+			return fmt.Errorf("%v\n\nAvailable report types: contributor, epic, product-area, team", err)
+		}
+		config.ReportType = rt
+		return nil
 	}
 
 	return nil
