@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/hannasdev/kanban-reports/internal/metrics"
@@ -43,182 +42,290 @@ type Config struct {
 	ShowHelp    bool
 }
 
+// flagSet holds all parsed command-line flags
+type flagSet struct {
+	csvPath      *string
+	reportType   *string
+	metricsType  *string
+	periodType   *string
+	startDateStr *string
+	endDateStr   *string
+	lastNDays    *int
+	outputPath   *string
+	delimiterStr *string
+	adHocFilter  *string
+	filterField  *string
+	
+	// Control flags
+	help         *bool
+	helpShort    *bool
+	interactive  *bool
+	interactiveShort *bool
+	version      *bool
+	examples     *bool
+}
+
 // ParseFlags parses command-line flags and returns a populated Config
 func ParseFlags() (*Config, error) {
-	config := &Config{}
-	var err error
-
-	// Define command-line flags
-	csvPath := flag.String("csv", "", "Path to the kanban CSV file")
-	reportType := flag.String("type", "", "Type of report: contributor, epic, product-area, team")
-	metricsType := flag.String("metrics", "", "Type of metrics: lead-time, throughput, flow, estimation, age, improvement, all")
-	periodType := flag.String("period", "month", "Time period for reports: week, month")
-	startDateStr := flag.String("start", "", "Start date (YYYY-MM-DD)")
-	endDateStr := flag.String("end", "", "End date (YYYY-MM-DD)")
-	lastNDays := flag.Int("last", 0, "Generate report for the last N days")
-	outputPath := flag.String("output", "", "Path to save the report (optional)")
-	delimiterStr := flag.String("delimiter", "auto", "CSV delimiter: comma, tab, semicolon, or auto for automatic detection")
-	adHocFilter := flag.String("ad-hoc", "include", "How to handle ad-hoc requests: include, exclude, only")
-	filterField := flag.String("filter-field", "completed_at", "Date field to filter by: completed_at, created_at, started_at")
+	flags := defineFlags()
 	
-	// New flags for improved CLI experience
-	help := flag.Bool("help", false, "Show help information and usage examples")
-	helpShort := flag.Bool("h", false, "Show help information and usage examples")
-	interactive := flag.Bool("interactive", false, "Run in interactive menu mode")
-	interactiveShort := flag.Bool("i", false, "Run in interactive menu mode")
-	version := flag.Bool("version", false, "Show version information")
-	examples := flag.Bool("examples", false, "Show usage examples")
-
-	// Custom usage function
-	flag.Usage = func() {
-		showUsage()
-	}
-
+	flag.Usage = showUsage
 	flag.Parse()
 
-	// Handle special flags first
-	if *help || *helpShort {
+	// Handle special control flags first
+	if err := handleControlFlags(flags); err != nil {
+		return nil, err
+	}
+
+	// Check for interactive mode
+	if *flags.interactive || *flags.interactiveShort {
+		return &Config{Interactive: true}, nil
+	}
+
+	// Parse and validate configuration
+	config, err := buildConfig(flags)
+	if err != nil {
+		return nil, fmt.Errorf("%v\n\nFor help: %s --help", err, os.Args[0])
+	}
+
+	return config, nil
+}
+
+// defineFlags sets up all command-line flags
+func defineFlags() *flagSet {
+	return &flagSet{
+		csvPath:      flag.String("csv", "", "Path to the kanban CSV file"),
+		reportType:   flag.String("type", "", "Type of report: contributor, epic, product-area, team"),
+		metricsType:  flag.String("metrics", "", "Type of metrics: lead-time, throughput, flow, estimation, age, improvement, all"),
+		periodType:   flag.String("period", DefaultPeriodType, "Time period for reports: week, month"),
+		startDateStr: flag.String("start", "", "Start date (YYYY-MM-DD)"),
+		endDateStr:   flag.String("end", "", "End date (YYYY-MM-DD)"),
+		lastNDays:    flag.Int("last", 0, "Generate report for the last N days"),
+		outputPath:   flag.String("output", "", "Path to save the report (optional)"),
+		delimiterStr: flag.String("delimiter", DefaultDelimiter, "CSV delimiter: comma, tab, semicolon, or auto for automatic detection"),
+		adHocFilter:  flag.String("ad-hoc", DefaultAdHocFilter, "How to handle ad-hoc requests: include, exclude, only"),
+		filterField:  flag.String("filter-field", DefaultFilterField, "Date field to filter by: completed_at, created_at, started_at"),
+		
+		help:             flag.Bool("help", false, "Show help information and usage examples"),
+		helpShort:        flag.Bool("h", false, "Show help information and usage examples"),
+		interactive:      flag.Bool("interactive", false, "Run in interactive menu mode"),
+		interactiveShort: flag.Bool("i", false, "Run in interactive menu mode"),
+		version:          flag.Bool("version", false, "Show version information"),
+		examples:         flag.Bool("examples", false, "Show usage examples"),
+	}
+}
+
+// handleControlFlags processes special flags like help, version, examples
+func handleControlFlags(flags *flagSet) error {
+	if *flags.help || *flags.helpShort {
 		showHelp()
 		os.Exit(0)
 	}
 
-	if *version {
+	if *flags.version {
 		showVersion()
 		os.Exit(0)
 	}
 
-	if *examples {
+	if *flags.examples {
 		showExamples()
 		os.Exit(0)
 	}
 
-	if *interactive || *interactiveShort {
-		config.Interactive = true
-		return config, nil
+	return nil
+}
+
+// buildConfig constructs and validates the configuration from parsed flags
+func buildConfig(flags *flagSet) (*Config, error) {
+	config := &Config{}
+
+	// Validate and set required fields
+	if err := setCSVPath(config, *flags.csvPath); err != nil {
+		return nil, err
 	}
 
-	// Validate and set CSV path
-	if *csvPath == "" {
-		return nil, fmt.Errorf("CSV file path is required. Use --csv to specify the file path.\n\nFor help: %s --help", os.Args[0])
+	if err := setDelimiter(config, *flags.delimiterStr); err != nil {
+		return nil, err
 	}
 
-	// Validate the CSV path early
-	if err := validation.ValidateCSVPath(*csvPath); err != nil {
-		csvErr, ok := err.(validation.CSVPathError)
-		if !ok {
-			return nil, fmt.Errorf("CSV file validation failed: %v\n\nFor help: %s --help", err, os.Args[0])
+	if err := setReportAndMetricsTypes(config, *flags.reportType, *flags.metricsType); err != nil {
+		return nil, err
+	}
+
+	if err := setPeriodType(config, *flags.periodType); err != nil {
+		return nil, err
+	}
+
+	if err := setFilterOptions(config, *flags.adHocFilter, *flags.filterField); err != nil {
+		return nil, err
+	}
+
+	if err := setDateRange(config, *flags.startDateStr, *flags.endDateStr, *flags.lastNDays); err != nil {
+		return nil, err
+	}
+
+	config.OutputPath = *flags.outputPath
+
+	return config, nil
+}
+
+// setCSVPath validates and sets the CSV file path
+func setCSVPath(config *Config, csvPath string) error {
+	if csvPath == "" {
+		return fmt.Errorf("CSV file path is required. Use --csv to specify the file path")
+	}
+
+	if err := validation.ValidateCSVPath(csvPath); err != nil {
+		return formatCSVValidationError(err, csvPath)
+	}
+
+	config.CSVPath = csvPath
+	return nil
+}
+
+// formatCSVValidationError provides user-friendly error messages for CSV validation failures
+func formatCSVValidationError(err error, csvPath string) error {
+	csvErr, ok := err.(validation.CSVPathError)
+	if !ok {
+		return fmt.Errorf("CSV file validation failed: %v", err)
+	}
+
+	switch csvErr.Type {
+	case "is_directory":
+		suggestions := validation.SuggestCSVFiles(csvPath)
+		if len(suggestions) > 0 {
+			return fmt.Errorf("%s\n\nFound CSV files in that directory:\n%s\n\nPlease specify the full path to one of these files", 
+				csvErr.Message, formatSuggestions(suggestions))
 		}
+		return fmt.Errorf("%s", csvErr.Message)
 		
-		// Provide specific error messages based on error type
-		switch csvErr.Type {
-		case "is_directory":
-			suggestions := validation.SuggestCSVFiles(*csvPath)
-			if len(suggestions) > 0 {
-				return nil, fmt.Errorf("%s\n\nFound CSV files in that directory:\n%s\n\nPlease specify the full path to one of these files.\nFor help: %s --help", 
-					csvErr.Message, 
-					formatSuggestions(suggestions), 
-					os.Args[0])
-			}
-			return nil, fmt.Errorf("%s\n\nFor help: %s --help", csvErr.Message, os.Args[0])
-			
-		case "not_found":
-			return nil, fmt.Errorf("%s\n\nMake sure the file path is correct and the file exists.\nFor help: %s --help", csvErr.Message, os.Args[0])
-			
-		case "not_readable":
-			return nil, fmt.Errorf("%s\n\nCheck file permissions or if the file is open in another program.\nFor help: %s --help", csvErr.Message, os.Args[0])
-			
-		default:
-			return nil, fmt.Errorf("%s\n\nFor help: %s --help", csvErr.Message, os.Args[0])
-		}
+	case "not_found":
+		return fmt.Errorf("%s\n\nMake sure the file path is correct and the file exists", csvErr.Message)
+		
+	case "not_readable":
+		return fmt.Errorf("%s\n\nCheck file permissions or if the file is open in another program", csvErr.Message)
+		
+	default:
+		return fmt.Errorf("%s", csvErr.Message)
 	}
+}
 
-	config.CSVPath = *csvPath
-
-	// Set delimiter
-	config.Delimiter, err = models.ParseDelimiter(*delimiterStr)
+// setDelimiter parses and sets the CSV delimiter
+func setDelimiter(config *Config, delimiterStr string) error {
+	delimiter, err := models.ParseDelimiter(delimiterStr)
 	if err != nil {
 		fmt.Printf("Warning: %v, using auto-detection\n", err)
 		config.Delimiter = models.DelimiterAuto
+		return nil
+	}
+	config.Delimiter = delimiter
+	return nil
+}
+
+// setReportAndMetricsTypes validates that exactly one of report type or metrics type is specified
+func setReportAndMetricsTypes(config *Config, reportType, metricsType string) error {
+	if metricsType == "" && reportType == "" {
+		return fmt.Errorf("either --type or --metrics must be specified")
 	}
 
-	// Validate that either report type or metrics type is specified
-	if *metricsType == "" && *reportType == "" {
-		return nil, fmt.Errorf("either --type or --metrics must be specified.\n\nFor help: %s --help\nFor examples: %s --examples", os.Args[0], os.Args[0])
+	if metricsType != "" && reportType != "" {
+		return fmt.Errorf("cannot specify both --type and --metrics")
 	}
 
-	// Parse report type with validation
-	if *metricsType == "" {
-		config.ReportType, err = reports.ParseReportType(*reportType)
+	if reportType != "" {
+		rt, err := reports.ParseReportType(reportType)
 		if err != nil {
-			return nil, fmt.Errorf("%v\n\nAvailable report types: contributor, epic, product-area, team\nFor help: %s --help", err, os.Args[0])
+			return fmt.Errorf("%v\n\nAvailable report types: contributor, epic, product-area, team", err)
 		}
+		config.ReportType = rt
 	}
 
-	// Parse metrics type with validation
-	if *metricsType != "" {
-		config.MetricsType, err = metrics.ParseMetricsType(*metricsType)
+	if metricsType != "" {
+		mt, err := metrics.ParseMetricsType(metricsType)
 		if err != nil {
-			return nil, fmt.Errorf("%v\n\nAvailable metrics types: lead-time, throughput, flow, estimation, age, improvement, all\nFor help: %s --help", err, os.Args[0])
+			return fmt.Errorf("%v\n\nAvailable metrics types: lead-time, throughput, flow, estimation, age, improvement, all", err)
 		}
+		config.MetricsType = mt
 	}
 
-	// Parse period type with validation
-	config.PeriodType, err = metrics.ParsePeriodType(*periodType)
+	return nil
+}
+
+// setPeriodType parses and validates the period type
+func setPeriodType(config *Config, periodType string) error {
+	pt, err := metrics.ParsePeriodType(periodType)
 	if err != nil {
-		return nil, fmt.Errorf("%v\nFor help: %s --help", err, os.Args[0])
+		return err
 	}
+	config.PeriodType = pt
+	return nil
+}
 
-	// Parse ad-hoc filter with validation
-	config.AdHocFilter, err = types.ParseAdHocFilterType(*adHocFilter)
+// setFilterOptions parses and sets filtering configuration
+func setFilterOptions(config *Config, adHocFilter, filterField string) error {
+	af, err := types.ParseAdHocFilterType(adHocFilter)
 	if err != nil {
-		return nil, fmt.Errorf("%v\nFor help: %s --help", err, os.Args[0])
+		return err
 	}
+	config.AdHocFilter = af
 
-	// Validate filter field
-	config.FilterField, err = models.ParseFilterField(*filterField)
+	ff, err := models.ParseFilterField(filterField)
 	if err != nil {
-		return nil, fmt.Errorf("%v\nFor help: %s --help", err, os.Args[0])
+		return err
+	}
+	config.FilterField = ff
+
+	return nil
+}
+
+// setDateRange validates and sets the date range configuration
+func setDateRange(config *Config, startDateStr, endDateStr string, lastNDays int) error {
+	if lastNDays < 0 {
+		return fmt.Errorf("last N days must be a positive number, got: %d", lastNDays)
 	}
 
-	// Validate and process date range
-	if *lastNDays < 0 {
-		return nil, fmt.Errorf("last N days must be a positive number, got: %d\nFor help: %s --help", *lastNDays, os.Args[0])
-	}
-
-	// If last N days is specified, it takes precedence
-	if *lastNDays > 0 {
-		config.LastNDays = *lastNDays
+	// Last N days takes precedence
+	if lastNDays > 0 {
+		config.LastNDays = lastNDays
 		config.EndDate = time.Now()
-		config.StartDate = config.EndDate.AddDate(0, 0, -*lastNDays)
-	} else {
-		// Otherwise use explicit start/end dates
-		if *startDateStr != "" {
-			config.StartDate, err = time.Parse("2006-01-02", *startDateStr)
-			if err != nil {
-				return nil, fmt.Errorf("error parsing start date: %v\nExpected format: YYYY-MM-DD\nFor help: %s --help", err, os.Args[0])
-			}
-		}
-
-		if *endDateStr != "" {
-			config.EndDate, err = time.Parse("2006-01-02", *endDateStr)
-			if err != nil {
-				return nil, fmt.Errorf("error parsing end date: %v\nExpected format: YYYY-MM-DD\nFor help: %s --help", err, os.Args[0])
-			}
-			// Set end date to the end of the day
-			config.EndDate = config.EndDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-		}
+		config.StartDate = config.EndDate.AddDate(0, 0, -lastNDays)
+		return nil
 	}
 
-	// Set output path
-	config.OutputPath = *outputPath
+	// Parse explicit dates
+	if err := parseExplicitDates(config, startDateStr, endDateStr); err != nil {
+		return err
+	}
 
 	// Validate date range consistency
 	if !config.StartDate.IsZero() && !config.EndDate.IsZero() && config.EndDate.Before(config.StartDate) {
-		return nil, fmt.Errorf("invalid date range: end date (%s) is before start date (%s)\nFor help: %s --help", 
-			config.EndDate.Format("2006-01-02"), config.StartDate.Format("2006-01-02"), os.Args[0])
+		return fmt.Errorf("invalid date range: end date (%s) is before start date (%s)", 
+			config.EndDate.Format(DateFormat), config.StartDate.Format(DateFormat))
 	}
 
-	return config, nil
+	return nil
+}
+
+// parseExplicitDates parses start and end date strings
+func parseExplicitDates(config *Config, startDateStr, endDateStr string) error {
+	if startDateStr != "" {
+		startDate, err := time.Parse(DateFormat, startDateStr)
+		if err != nil {
+			return fmt.Errorf("error parsing start date: %v\nExpected format: YYYY-MM-DD", err)
+		}
+		config.StartDate = startDate
+	}
+
+	if endDateStr != "" {
+		endDate, err := time.Parse(DateFormat, endDateStr)
+		if err != nil {
+			return fmt.Errorf("error parsing end date: %v\nExpected format: YYYY-MM-DD", err)
+		}
+		// Set end date to the end of the day
+		config.EndDate = endDate.Add(HoursPerDay*time.Hour + MinutesPerHour*time.Minute + SecondsPerMinute*time.Second)
+	}
+
+	return nil
 }
 
 // IsMetricsReport returns true if a metrics report is requested
@@ -231,242 +338,7 @@ func (c *Config) GetDateRange() (time.Time, time.Time) {
 	return c.StartDate, c.EndDate
 }
 
-// showUsage displays basic usage information
-func showUsage() {
-	fmt.Printf(`%s - Generate reports and metrics from Kanban CSV data
-
-USAGE:
-    %s [OPTIONS]
-    %s --interactive
-    %s --help
-
-For detailed help and examples, use:
-    %s --help
-    %s --examples
-
-`, os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
-}
-
-// showVersion displays version information
-func showVersion() {
-	fmt.Printf(`Kanban Reports v1.0.0
-A tool for generating productivity reports from Kanban board CSV exports.
-
-Build Information:
-  Go Version: %s
-  Platform: %s
-
-`, getGoVersion(), getPlatform())
-}
-
-// showHelp displays comprehensive help information
-func showHelp() {
-	fmt.Printf(`🔄 Kanban Reports - Help & Usage Guide
-=====================================
-
-DESCRIPTION:
-    Generate insightful reports and metrics from your Kanban board CSV exports.
-    Track team productivity, analyze flow efficiency, and identify improvement opportunities.
-
-QUICK EXIT:
-    Type 'q', 'quit', 'exit', or 'bye' at any prompt to exit gracefully.
-
-USAGE:
-    %s [OPTIONS]                    # Command-line mode
-    %s --interactive                # Interactive menu mode
-    %s --help                       # Show this help
-
-MODES:
-    🎯 Interactive Mode (Recommended for beginners):
-        %s --interactive
-        %s -i
-        
-        Guided step-by-step menu to configure your report.
-
-    ⚡ Command-line Mode (Great for automation):
-        %s --csv data.csv --type contributor --last 7
-
-REQUIRED OPTIONS:
-    --csv FILE                      Path to your kanban CSV file
-    
-    Choose ONE of:
-    --type TYPE                     Generate a report (see REPORT TYPES)
-    --metrics TYPE                  Generate metrics (see METRICS TYPES)
-
-REPORT TYPES (--type):
-    contributor                     Story points by person who completed work
-    epic                           Story points by epic/initiative
-    product-area                   Story points by product area
-    team                           Story points by team
-
-METRICS TYPES (--metrics):
-    lead-time                      How long items take from creation to completion
-    throughput                     Completion rates over time (items & points)
-    flow                          Flow efficiency (active vs waiting time)
-    estimation                    Estimation accuracy (estimates vs actual time)
-    age                           Age analysis of current incomplete work
-    improvement                   Month-over-month improvement trends
-    all                           Generate all metrics above
-
-DATE FILTERING:
-    --last N                       Include only last N days
-    --start YYYY-MM-DD             Start date (inclusive)
-    --end YYYY-MM-DD               End date (inclusive)
-    
-    Examples:
-    --last 7                       Last week
-    --last 30                      Last month
-    --last 90                      Last quarter
-    --start 2024-01-01 --end 2024-03-31    Q1 2024
-
-AD-HOC REQUEST FILTERING:
-    --ad-hoc include               Include all items (default)
-    --ad-hoc exclude               Exclude items labeled 'ad-hoc-request'
-    --ad-hoc only                  Only items labeled 'ad-hoc-request'
-
-TIME PERIODS (for metrics):
-    --period week                  Group by week (for throughput metrics)
-    --period month                 Group by month (default)
-
-OUTPUT OPTIONS:
-    --output FILE                  Save report to file
-                                  (default: display in console)
-
-CSV OPTIONS:
-    --delimiter auto               Auto-detect delimiter (default)
-    --delimiter comma              Comma-separated values
-    --delimiter semicolon          Semicolon-separated values
-    --delimiter tab                Tab-separated values
-
-OTHER OPTIONS:
-    --filter-field FIELD           Date field to filter by:
-                                  completed_at (default), created_at, started_at
-    --help, -h                     Show this help
-    --examples                     Show usage examples
-    --version                      Show version information
-    --interactive, -i              Run interactive mode
-
-CSV FILE FORMAT:
-    Your CSV must include these columns:
-    • id, name, estimate, is_completed, completed_at
-    
-    Optional but useful columns:
-    • owners, epic, team, product_area, type, labels
-
-GETTING STARTED:
-    1. Export your kanban data as CSV
-    2. Run: %s --interactive
-    3. Follow the guided setup
-    4. Analyze your results!
-
-For more examples: %s --examples
-
-`, os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
-}
-
-// showExamples displays practical usage examples
-func showExamples() {
-	fmt.Printf(`🚀 Kanban Reports - Usage Examples
-=================================
-
-BASIC REPORTS:
-    # Team productivity this month
-    %s --csv kanban-data.csv --type contributor --last 30
-
-    # Epic progress over the quarter
-    %s --csv kanban-data.csv --type epic --last 90 --output epic-report.txt
-
-    # Product area breakdown for specific period
-    %s --csv kanban-data.csv --type product-area --start 2024-01-01 --end 2024-03-31
-
-METRICS ANALYSIS:
-    # Analyze lead times by story point size
-    %s --csv kanban-data.csv --metrics lead-time --last 90
-
-    # Weekly throughput trends
-    %s --csv kanban-data.csv --metrics throughput --period week --last 180
-
-    # Complete metrics analysis
-    %s --csv kanban-data.csv --metrics all --last 90 --output full-analysis.txt
-
-FILTERING EXAMPLES:
-    # Exclude ad-hoc work to see planned work only
-    %s --csv kanban-data.csv --type team --last 30 --ad-hoc exclude
-
-    # Analyze only urgent/ad-hoc requests
-    %s --csv kanban-data.csv --metrics throughput --ad-hoc only --last 60
-
-    # Filter by creation date instead of completion date
-    %s --csv kanban-data.csv --type contributor --last 30 --filter-field created_at
-
-ADVANCED WORKFLOWS:
-    # Generate monthly reports for stakeholders
-    %s --csv kanban-data.csv --type epic --last 30 --output monthly-epic-report.txt
-    %s --csv kanban-data.csv --metrics improvement --output monthly-trends.txt
-
-    # Analyze different time periods
-    %s --csv kanban-data.csv --metrics lead-time --start 2024-01-01 --end 2024-02-29
-    %s --csv kanban-data.csv --metrics lead-time --start 2024-03-01 --end 2024-05-31
-
-    # Compare planned vs ad-hoc work
-    %s --csv kanban-data.csv --type contributor --last 30 --ad-hoc exclude --output planned.txt
-    %s --csv kanban-data.csv --type contributor --last 30 --ad-hoc only --output adhoc.txt
-
-INTERACTIVE MODE:
-    # Best for first-time users or complex configurations
-    %s --interactive
-    %s -i
-
-AUTOMATION EXAMPLES:
-    # Weekly team report script
-    #!/bin/bash
-    DATE=$(date +%%Y-%%m-%%d)
-    %s --csv latest-export.csv --type team --last 7 --output "weekly-report-$DATE.txt"
-    
-    # Monthly metrics dashboard
-    %s --csv kanban-export.csv --metrics all --last 30 --output monthly-metrics.txt
-
-CSV FILE TIPS:
-    • Export from Jira, Azure DevOps, Linear, or any kanban tool
-    • Ensure dates are in YYYY/MM/DD HH:MM:SS format
-    • Use 'ad-hoc-request' label for ad-hoc work filtering
-    • Semi-colon separate multiple owners: john@co.com;jane@co.com
-
-COMMON WORKFLOWS:
-    1. Sprint Review Prep:
-       %s --csv sprint-data.csv --type contributor --last 14
-
-    2. Epic Progress Check:
-       %s --csv project-data.csv --type epic --start 2024-01-01
-
-    3. Process Improvement Analysis:
-       %s --csv flow-data.csv --metrics flow --last 90
-
-    4. Team Performance Review:
-       %s --csv team-data.csv --metrics improvement --last 180
-
-Need help? Run: %s --help
-
-`, 
-		// Now provide exactly 24 arguments to match the 24 %s placeholders
-		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
-		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
-		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], 
-		os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
-}
-
-// Helper functions for system information
-func getGoVersion() string {
-	// In a real implementation, you might want to embed this at build time
-	return "1.21+"
-}
-
-func getPlatform() string {
-	// In a real implementation, you might want to embed this at build time
-	return "linux/amd64"
-}
-
-// Add this helper function at the end of the file:
+// formatSuggestions formats a list of file suggestions for display
 func formatSuggestions(suggestions []string) string {
 	if len(suggestions) == 0 {
 		return ""
@@ -474,11 +346,11 @@ func formatSuggestions(suggestions []string) string {
 	
 	result := ""
 	for i, suggestion := range suggestions {
-		if i >= 3 { // Limit to 3 suggestions in CLI mode
-			result += fmt.Sprintf("   ... and %d more", len(suggestions)-3)
+		if i >= MaxSuggestionsDisplay {
+			result += fmt.Sprintf("   ... and %d more", len(suggestions)-MaxSuggestionsDisplay)
 			break
 		}
 		result += fmt.Sprintf("   • %s\n", suggestion)
 	}
-	return strings.TrimSuffix(result, "\n")
+	return result[:len(result)-1] // Remove trailing newline
 }
