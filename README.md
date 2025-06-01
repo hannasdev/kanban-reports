@@ -1,54 +1,96 @@
 # Kanban Reports
 
-A Go application for generating reports from Kanban board data exported as CSV. This tool helps track and analyze team productivity by generating reports on story points delivered, broken down by contributor, epic, product area, or team.
+A Go application for generating productivity reports and metrics from Kanban board data exported as CSV. Track team performance, analyze flow efficiency, and identify improvement opportunities with comprehensive reporting and metrics analysis.
 
-## Features
+## 🚀 Quick Start
 
-- Process CSV exports from kanban boards
-- Generate reports by:
-  - Contributor (who completed the work)
-  - Epic (which larger initiatives the work belongs to)
-  - Product Area (which product categories the work affects)
-  - Team (which teams are delivering the most)
-- Generate advanced metrics:
-  - Lead Time Analysis (how long items take to complete)
-  - Throughput Analysis (completion rates over time)
-  - Flow Efficiency (active vs. waiting time)
-  - Estimation Accuracy (correlation between estimates and actual time)
-  - Work Item Age (analysis of current incomplete work)
-  - Team Improvement (month-over-month trends)
+### Option 1: Interactive Mode (Recommended for beginners)
+
+```bash
+# Build and run setup
+./scripts/setup.sh
+
+# Start interactive mode
+./bin/kanban-reports --interactive
+```
+
+### Option 2: Command Line Mode
+
+```bash
+# Show all available options
+./bin/kanban-reports --help
+
+# See practical examples
+./bin/kanban-reports --examples
+
+# Quick example with sample data
+./bin/kanban-reports --csv data/sample.csv --type contributor --last 30
+```
+
+## 📊 Features
+
+### Reports
+
+- **Contributor Reports**: Story points by person who completed work
+- **Epic Reports**: Story points by epic/initiative
+- **Product Area Reports**: Story points by product category
+- **Team Reports**: Story points by team
+
+### Advanced Metrics
+
+- **Lead Time Analysis**: How long items take from creation to completion
+- **Throughput Analysis**: Completion rates over time (items & points)
+- **Flow Efficiency**: Active vs waiting time analysis
+- **Estimation Accuracy**: Correlation between estimates and actual time
+- **Work Item Age**: Age analysis of current incomplete work
+- **Team Improvement**: Month-over-month improvement trends
+
+### Filtering & Output
+
 - Filter by date ranges or last N days
 - Filter ad-hoc requests (include, exclude, or focus only on them)
 - Save reports to file or view in console
 - Automatic CSV delimiter detection (comma, tab, semicolon)
+- Multiple date field filtering options
 
-## Quick Start
+## 🔗 Shortcut.com Integration
 
-### Option 1: Interactive Mode (Recommended for beginners)
+This application is specifically designed to work with CSV exports from [Shortcut.com](https://shortcut.com) (formerly Clubhouse).
 
-#### Build and run setup
+### Exporting Data from Shortcut.com
 
-`./scripts/setup.sh`
+1. **Navigate to Stories**: Go to your Shortcut workspace and click on "Stories"
+2. **Apply Filters**: Use Shortcut's search and filter options to select the stories you want to analyze
+3. **Export to CSV**:
+   - Click the "Export" button in the top right
+   - Select "CSV" format
+   - Choose "All fields" for complete data export
+4. **Save the File**: Download the CSV file to your local machine
 
-#### Start interactive mode
+### Supported Shortcut Fields
 
-`./bin/kanban-reports --interactive`
+The application automatically maps Shortcut.com CSV columns including:
 
-### Option 2: Command Line Mode
+| Shortcut Field | Used For | Report Types |
+|----------------|----------|--------------|
+| `owners` | Contributor attribution | Contributor reports |
+| `epic` | Epic grouping | Epic reports |
+| `team` | Team attribution | Team reports |
+| `estimate` | Story points | All reports & metrics |
+| `completed_at` | Completion tracking | Date filtering, metrics |
+| `created_at` | Lead time calculation | Lead time metrics |
+| `started_at` | Cycle time calculation | Flow & cycle time metrics |
+| `labels` | Ad-hoc filtering | Filtering (looks for "ad-hoc-request" label) |
+| `product_area` | Product categorization | Product area reports |
 
-#### Show all available options
+### Tips for Shortcut Users
 
-`./bin/kanban-reports --help`
+- **Use Labels**: Tag ad-hoc requests with "ad-hoc-request" label for filtering
+- **Set Story Points**: Ensure stories have estimates for meaningful reports
+- **Track State Changes**: Use Shortcut's workflow states for accurate timing data
+- **Regular Exports**: Export data weekly/monthly for trend analysis
 
-#### See practical examples
-
-`./bin/kanban-reports --examples`
-
-#### Quick start with sample data
-
-`./bin/kanban-reports --csv data/sample.csv --type contributor --last 30`
-
-## Installation
+## 📦 Installation
 
 ### Prerequisites
 
@@ -65,58 +107,85 @@ cd kanban-reports
 go build -o bin/kanban-reports ./cmd/kanban-reports
 ```
 
-## Usage
-
-### Basic Usage
+### Using Make (Recommended)
 
 ```bash
-# Generate a contributor report for the last 7 days
-./bin/kanban-reports --csv data/kanban-data.csv --type contributor --last 7
+# Build, test, and set up everything
+make all
 
-# Generate an epic report for a specific date range
-./bin/kanban-reports --csv data/kanban-data.csv --type epic --start 2024-05-01 --end 2024-05-31
+# Or just build
+make build
 
-# Save the report to a file
-./bin/kanban-reports --csv data/kanban-data.csv --type product-area --last 14 --output product-report.txt
+# Run tests
+make test
 
-# Generate lead time metrics by story point size
-./bin/kanban-reports --csv data/kanban-data.csv --metrics lead-time --last 90
-
-# Generate throughput metrics by week
-./bin/kanban-reports --csv data/kanban-data.csv --metrics throughput --period week --last 180
-
-# Generate all metrics for a specific date range
-./bin/kanban-reports --csv data/kanban-data.csv --metrics all --start 2024-01-01 --end 2024-06-30 --output all-metrics.txt
-
-# Generate reports excluding ad-hoc requests
-./bin/kanban-reports --csv data/kanban-data.csv --type contributor --last 30 --ad-hoc exclude
-
-# Analyze only ad-hoc requests
-./bin/kanban-reports --csv data/kanban-data.csv --metrics throughput --last 90 --ad-hoc only
+# Install to GOPATH/bin
+make install
 ```
 
-### Command Line Options
+## 📖 Usage Examples
+
+### Basic Reports
+
+```bash
+# Team productivity this month
+./bin/kanban-reports --csv kanban-data.csv --type contributor --last 30
+
+# Epic progress over the quarter
+./bin/kanban-reports --csv kanban-data.csv --type epic --last 90 --output epic-report.txt
+
+# Product area breakdown for specific period
+./bin/kanban-reports --csv kanban-data.csv --type product-area --start 2024-01-01 --end 2024-03-31
+```
+
+### Metrics Analysis
+
+```bash
+# Analyze lead times by story point size
+./bin/kanban-reports --csv kanban-data.csv --metrics lead-time --last 90
+
+# Weekly throughput trends
+./bin/kanban-reports --csv kanban-data.csv --metrics throughput --period week --last 180
+
+# Complete metrics analysis
+./bin/kanban-reports --csv kanban-data.csv --metrics all --last 90 --output full-analysis.txt
+```
+
+### Advanced Filtering
+
+```bash
+# Exclude ad-hoc work to see planned work only
+./bin/kanban-reports --csv kanban-data.csv --type team --last 30 --ad-hoc exclude
+
+# Analyze only urgent/ad-hoc requests
+./bin/kanban-reports --csv kanban-data.csv --metrics throughput --ad-hoc only --last 60
+
+# Filter by creation date instead of completion date
+./bin/kanban-reports --csv kanban-data.csv --type contributor --last 30 --filter-field created_at
+```
+
+## ⚙️ Command Line Options
 
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--help, -h` | Complete help with all options | `./bin/kanban-reports --help` |
 | `--examples` | Practical usage examples | `./bin/kanban-reports --examples` |
 | `--version` | Version information | `./bin/kanban-reports --version` |
-| `--interactive, -i` | Interactive menu mode | `./bin/kanban-reports` |
+| `--interactive, -i` | Interactive menu mode | `./bin/kanban-reports -i` |
 | `--csv` | Path to the kanban CSV file (required) | `--csv data/kanban-data.csv` |
-| `--type` | Type of report to generate (contributor, epic, product-area, team) | `--type epic` |
-| `--metrics` | Type of metrics to generate (lead-time, throughput, flow, estimation, age, improvement, all) | `--metrics lead-time` |
-| `--period` | Time period for metrics reports (week, month) | `--period week` |
-| `--start` | Start date in YYYY-MM-DD format | `--start 2024-05-01` |
-| `--end` | End date in YYYY-MM-DD format | `--end 2024-05-31` |
-| `--last` | Generate report for the last N days | `--last 7` |
-| `--output` | Path to save the report (optional) | `--output report.txt` |
-| `--delimiter` | CSV delimiter: comma, tab, semicolon, or auto (default: auto) | `--delimiter comma` |
-| `--ad-hoc` | How to handle ad-hoc requests: include, exclude, only (default: include) | `--ad-hoc exclude` |
+| `--type` | Report type (contributor, epic, product-area, team) | `--type epic` |
+| `--metrics` | Metrics type (lead-time, throughput, flow, estimation, age, improvement, all) | `--metrics lead-time` |
+| `--period` | Time period for metrics (week, month) | `--period week` |
+| `--start` | Start date (YYYY-MM-DD) | `--start 2024-05-01` |
+| `--end` | End date (YYYY-MM-DD) | `--end 2024-05-31` |
+| `--last` | Last N days | `--last 7` |
+| `--output` | Save to file | `--output report.txt` |
+| `--delimiter` | CSV delimiter (comma, tab, semicolon, auto) | `--delimiter comma` |
+| `--ad-hoc` | Ad-hoc filter (include, exclude, only) | `--ad-hoc exclude` |
 
-## CSV Data Format
+## 📋 CSV Data Format
 
-The application expects a CSV file with the following required columns:
+### Required Columns
 
 - `id`: Unique identifier for the item
 - `name`: Name or title of the item
@@ -124,82 +193,42 @@ The application expects a CSV file with the following required columns:
 - `is_completed`: Boolean indicating if the item is completed
 - `completed_at`: Date when the item was completed
 
-Additional useful columns:
+### Optional but Recommended Columns
 
-- `owners`: Person(s) assigned to the item
+- `owners`: Person(s) assigned to the item (semicolon-separated)
 - `epic`: Epic name
 - `team`: Team name
 - `product_area`: Product area or category
 - `type`: Type of work (feature, bug, task, etc.)
+- `created_at`: When the item was created
+- `started_at`: When work began on the item
+- `labels`: Labels (use "ad-hoc-request" for filtering)
 
-Example of the first row of CSV data:
+### Example CSV Header
 
 ```csv
 id,name,type,requester,owners,description,is_completed,created_at,started_at,updated_at,moved_at,completed_at,estimate,external_ticket_count,external_tickets,is_blocked,is_a_blocker,due_date,labels,epic_labels,tasks,state,epic_id,epic,project_id,project,iteration_id,iteration,utc_offset,is_archived,team_id,team,epic_state,epic_is_archived,epic_created_at,epic_started_at,epic_due_date,milestone_id,milestone,milestone_state,milestone_created_at,milestone_started_at,milestone_due_date,milestone_categories,epic_planned_start_date,workflow,workflow_id,priority,severity,product_area,skill_set,technical_area,custom_fields
 ```
 
-## Report Types
+## 📊 Sample Output
 
-### Epic Report
+### Contributor Report
 
-Shows story points completed by epic.
+```txt
+Story Points by Contributor:
 
-Example output:
+john@example.com                 25.0 points   8 items
+jane@example.com                 18.5 points   6 items
+bob@example.com                  12.0 points   4 items
+Unassigned                        3.0 points   2 items
 
-```zsh
-Story Points by Epic:
-
-API Modernization                      20.0 points   7 items
-User Authentication Overhaul           15.5 points   5 items
-No Epic                                 8.0 points   3 items
-
-Total: 43.5 points across 15 items
+Total: 58.5 points across 20 items
 ```
-
-### Product Area Report
-
-Shows story points completed by product area.
-
-Example output:
-
-```zsh
-Story Points by Product Area:
-
-Backend                         25.0 points  10 items
-Frontend                        18.5 points   7 items
-Uncategorized                    5.0 points   2 items
-
-Total: 48.5 points across 19 items
-```
-
-### Team Report
-
-Shows story points completed by team.
-
-Example output:
-
-```zsh
-Story Points by Team:
-
-Team Alpha                      30.0 points  12 items
-Team Beta                       20.5 points   8 items
-No Team                          4.0 points   2 items
-
-Total: 54.5 points across 22 items
-```
-
-## Metrics Types
 
 ### Lead Time Metrics
 
-Analyzes how long items take to complete, broken down by story point size.
-
-Example output:
-
-```zsh
+```txt
 # Lead Time Analysis by Story Point Size (in days)
-
-## Lead Time (Creation to Completion)
 
 Story points | Count | Min | Max | Avg | Median
 -------------|-------|-----|-----|-----|-------
@@ -209,29 +238,9 @@ Story points | Count | Min | Max | Avg | Median
            8 |     5 | 7.2 | 21.5 | 14.3 |   12.8
 ```
 
-### Throughput Metrics
-
-Shows completion rates over time, broken down by week or month.
-
-Example output:
-
-```zsh
-# Throughput Analysis by Month
-
-Month   | Items Completed | Story Points | Avg Points/Item
---------|----------------|-------------|---------------
-2024-01 |             12 |        45.0 |           3.8
-2024-02 |             15 |        62.0 |           4.1
-2024-03 |             18 |        72.0 |           4.0
-```
-
 ### Flow Efficiency Metrics
 
-Analyzes the percentage of time items spend in active states versus waiting.
-
-Example output:
-
-```zsh
+```txt
 # Flow Efficiency Analysis
 
 State   | Avg Time (days) | % of Total Time
@@ -242,171 +251,126 @@ Active  |             5.0 |         28.6%
 Flow Efficiency: 28.6%
 ```
 
-### Estimation Accuracy Metrics
+## 🏗️ Project Structure
 
-Compares story point estimates with actual completion times.
-
-Example output:
-
-```zsh
-# Estimation Accuracy Analysis
-
-## Time Spent per Story Point Size
-
-Story points | Count | Min Days/SP | Max Days/SP | Avg Days/SP | Median Days/SP
--------------|-------|------------|------------|-------------|---------------
-           1 |    15 |        1.2 |        3.5 |         2.1 |             1.9
-           3 |    12 |        1.0 |        2.8 |         1.8 |             1.7
-           5 |     8 |        1.1 |        2.5 |         1.7 |             1.6
-```
-
-### Work Item Age Metrics
-
-Analyzes the age of current work items by state.
-
-Example output:
-
-```zsh
-# Current Work Item Age Analysis
-
-## In Progress (5 items)
-
-Min: 2.1, Max: 15.3, Avg: 7.2, Median: 5.5 days
-
-Oldest Items:
-
-- API Authentication Refactoring (15.3 days)
-- Payment Processing Bug (10.8 days)
-- User Profile UI Update (7.4 days)
-```
-
-### Team Improvement Metrics
-
-Shows trends in team performance over time.
-
-Example output:
-
-```zsh
-# Team Improvement Metrics
-
-Month   | Items | Points | Avg Lead Time | Avg Cycle Time | Lead Time Δ | Cycle Time Δ
---------|-------|--------|---------------|----------------|------------|-------------
-2024-01 |    12 |   45.0 |          18.5 |            8.2 |            |             
-2024-02 |    15 |   62.0 |          16.8 |            7.5 | -1.7 (-9.2%) | -0.7 (-8.5%)
-2024-03 |    18 |   72.0 |          14.2 |            6.8 | -2.6 (-15.5%) | -0.7 (-9.3%)
-```
-
-## Project Structure
-
-```zsh
+```txt
 kanban-reports/
 ├── cmd/
 │   └── kanban-reports/         # Main application entry point
-│       └── main.go
 ├── internal/
-│   ├── config/                 # Application configuration
-│   │   └── config.go
-│   ├── models/                 # Data models
-│   │   └── kanban_item.go
+│   ├── config/                 # Application configuration & CLI parsing
+│   ├── menu/                   # Interactive menu system
+│   ├── models/                 # Data models and types
 │   ├── parser/                 # CSV parsing logic
-│   │   └── csv_parser.go
 │   ├── reports/                # Report generation
-│   │   ├── reporter.go         # Core reporter functionality
-│   │   ├── types.go            # Type definitions
-│   │   ├── contributor.go      # Contributor report implementation
-│   │   ├── epic.go             # Epic report implementation
-│   │   ├── product_area.go     # Product area report implementation
-│   │   └── team.go             # Team report implementation
-│   └── metrics/                # Metrics generation
-│       ├── metrics.go          # Core metrics generator
-│       ├── types.go            # Metrics type definitions
-│       ├── lead_time.go        # Lead time metrics
-│       ├── throughput.go       # Throughput metrics
-│       ├── flow.go             # Flow efficiency metrics
-│       ├── estimation.go       # Estimation accuracy metrics
-│       ├── age.go              # Work item age metrics
-│       ├── improvement.go      # Team improvement metrics
-│       └── util.go             # Common utility functions for metrics
-├── pkg/                        # Reusable public packages
-│   └── dateutil/               # Date handling utilities
-│       └── dateutil.go
-├── test/                       # Test data and helpers
-│   └── fixtures/               # Test fixture files
-│       └── sample.csv
-├── data/                      # Place your CSV files here
-│   └── kanban-data.csv
-├── go.mod
-└── go.sum
+│   ├── metrics/                # Advanced metrics generation
+│   └── validation/             # Input validation utilities
+├── pkg/
+│   ├── dateutil/               # Date handling utilities
+│   ├── filtering/              # Data filtering utilities
+│   └── types/                  # Shared type definitions
+├── scripts/                    # Build and setup scripts
+├── data/                       # Place your CSV files here
+├── Makefile                    # Build automation
+└── README.md
 ```
 
-## Development
+## 🧪 Development
 
-### Testing the Application
-
-Run the unit tests to ensure everything is working properly:
+### Running Tests
 
 ```bash
-# Run all unit tests
-go test ./internal/...
+# Run all tests
+make test
 
-# Run tests for a specific package
+# Run tests with coverage
+make coverage
+
+# Run tests for specific package
 go test ./internal/reports/...
 
 # Run with verbose output
 go test -v ./internal/...
-
-# Run with test coverage report
-go test -cover ./internal/...
 ```
 
 ### Adding New Report Types
 
-To add a new report type:
-
-1. Add a new report type constant in `internal/reports/types.go`
-2. Create a new file in `internal/reports/` for your report implementation
-3. Add a new report generation function in the Reporter struct
-4. Update the switch statement in `GenerateReport` to handle the new type
-5. Update `cmd/kanban-reports/main.go` to accept the new report type as a command-line option
+1. Add new constant in `internal/reports/types.go`
+2. Create implementation file in `internal/reports/`
+3. Update the switch statement in `GenerateReport`
+4. Add CLI option support in `cmd/kanban-reports/main.go`
 
 ### Adding New Metrics
 
-To add a new metrics type:
+1. Add new constant in `internal/metrics/types.go`
+2. Create implementation file in `internal/metrics/`
+3. Update the switch statement in `Generator.Generate()`
+4. Add CLI option support
 
-1. Add a new metrics type constant in `internal/metrics/types.go`
-2. Create a new file in `internal/metrics/` for your metrics implementation
-3. Add a new metrics generation function
-4. Update the switch statement in `Generator.Generate()` to handle the new type
-5. Update `cmd/kanban-reports/main.go` to accept the new metrics type as a command-line option
+## 🔧 Troubleshooting
 
-### Modifying the CSV Parser
+### Common Issues
 
-If your CSV format changes, you may need to update:
+**"required column 'X' not found"**
+- Ensure your CSV has the required columns: id, name, estimate, is_completed, completed_at
+- Check that column names match exactly (case-sensitive)
 
-1. The `KanbanItem` struct in `internal/models/kanban_item.go`
-2. The parsing logic in `internal/parser/csv_parser.go`
+**"CSV file validation failed"**
+- Verify the file path is correct
+- Ensure the file is readable and not corrupted
+- Try using `--delimiter auto` for automatic detection
 
-## Example Workflow
+**"No items completed in the specified date range"**
+- Check your date format (should be YYYY/MM/DD HH:MM:SS in CSV)
+- Verify date range includes completed items
+- Try using `--filter-field created_at` for broader results
 
-1. Export your kanban data as a CSV file from your kanban board tool
-2. Place the CSV file in the `data/` directory
-3. Run the application with your desired report type and date range
-4. Analyze the generated report to gain insights into your team's productivity
+### Getting Help
 
-## License
+```bash
+# Show detailed help
+./bin/kanban-reports --help
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+# See practical examples
+./bin/kanban-reports --examples
 
-## Contributing
+# Use interactive mode for guided setup
+./bin/kanban-reports --interactive
+```
+
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-When contributing:
+### Development Workflow
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/new-metric`)
-3. Commit your changes (`git commit -am 'Add new metric type'`)
-4. Push to the branch (`git push origin feature/new-metric`)
-5. Create a new Pull Request
+3. Write tests for your changes
+4. Ensure tests pass (`make test`)
+5. Commit your changes (`git commit -am 'Add new metric type'`)
+6. Push to the branch (`git push origin feature/new-metric`)
+7. Create a Pull Request
 
-Please make sure to update tests as appropriate and follow the modular code structure.
+### Code Standards
+
+- Follow Go conventions and idioms
+- Add tests for new functionality
+- Update documentation as needed
+- Use the existing code structure and patterns
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+## 🎯 Next Steps
+
+1. **First Time**: Run `./scripts/setup.sh` to get started quickly
+2. **Export Data**: Get your CSV from Shortcut.com (or other kanban tool)
+3. **Try Interactive Mode**: `./bin/kanban-reports --interactive`
+4. **Explore Metrics**: Start with `--metrics all` for comprehensive analysis
+5. **Automate Reports**: Set up regular exports and automated report generation
+
+For questions, issues, or feature requests, please open an issue on GitHub.
