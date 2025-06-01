@@ -3,6 +3,7 @@ package menu
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -15,22 +16,75 @@ import (
 	"github.com/hannasdev/kanban-reports/internal/validation"
 )
 
+// MenuInterface defines the interface for input/output operations
+type MenuInterface interface {
+	ReadInput(prompt string) (string, error)
+	Print(msg string)
+	Printf(format string, args ...interface{})
+	Println(msg string)
+}
+
 // Menu handles interactive menu functionality
 type Menu struct {
 	scanner *bufio.Scanner
+	writer  io.Writer
+	reader  io.Reader
 }
 
 // NewMenu creates a new interactive menu
 func NewMenu() *Menu {
 	return &Menu{
 		scanner: bufio.NewScanner(os.Stdin),
+		writer:  os.Stdout,
+		reader:  os.Stdin,
 	}
+}
+
+// NewMenuWithIO creates a new menu with custom input/output for testing
+func NewMenuWithIO(reader io.Reader, writer io.Writer) *Menu {
+	return &Menu{
+		scanner: bufio.NewScanner(reader),
+		writer:  writer,
+		reader:  reader,
+	}
+}
+
+func (m *Menu) print(msg string) {
+	fmt.Fprint(m.writer, msg)
+}
+
+// printf outputs formatted text to the configured writer
+func (m *Menu) printf(format string, args ...interface{}) {
+	fmt.Fprintf(m.writer, format, args...)
+}
+
+// println outputs a line to the configured writer
+func (m *Menu) println(msg string) {
+	fmt.Fprintln(m.writer, msg)
+}
+
+// readInput reads input from user and checks for quit commands
+func (m *Menu) readInput(prompt string) (string, error) {
+	m.print(prompt)
+	if !m.scanner.Scan() {
+		return "", fmt.Errorf("failed to read input")
+	}
+	
+	input := m.scanner.Text()
+	
+	// Check for quit command
+	if err := HandleQuit(input); err != nil {
+		return "", err
+	}
+	
+	return strings.TrimSpace(input), nil
 }
 
 // Run starts the interactive menu system
 func (m *Menu) Run() (*config.Config, error) {
-	fmt.Println("🔄 Kanban Reports - Interactive Mode")
-	fmt.Println("=====================================")
+	m.println("🔄 Kanban Reports - Interactive Mode")
+	m.println("=====================================")
+	ShowQuitHelp()
 	
 	cfg := &config.Config{}
 	
@@ -83,18 +137,18 @@ func (m *Menu) Run() (*config.Config, error) {
 }
 
 func (m *Menu) getCSVPath() (string, error) {
-	fmt.Println("\n📁 CSV File Selection")
-	fmt.Println("--------------------")
+	m.println("\n📁 CSV File Selection")
+	m.println("--------------------")
 	
 	for {
-		fmt.Print("Enter the path to your CSV file: ")
-		if !m.scanner.Scan() {
-			return "", fmt.Errorf("failed to read input")
+		path, err := m.readInput("Enter the path to your CSV file: ")
+		if err != nil {
+			// This already handles quit commands from readInput
+			return "", err
 		}
 		
-		path := strings.TrimSpace(m.scanner.Text())
 		if path == "" {
-			fmt.Println("❌ Please enter a valid file path")
+			m.println("❌ Please enter a valid file path")
 			continue
 		}
 		
@@ -102,100 +156,100 @@ func (m *Menu) getCSVPath() (string, error) {
 		if err := validation.ValidateCSVPath(path); err != nil {
 			csvErr, ok := err.(validation.CSVPathError)
 			if !ok {
-				fmt.Printf("❌ Error: %v\n", err)
+				m.printf("❌ Error: %v\n", err)
 				continue
 			}
 			
 			// Handle different error types with helpful suggestions
 			switch csvErr.Type {
 			case "is_directory":
-				fmt.Printf("❌ %s\n", csvErr.Message)
+				m.printf("❌ %s\n", csvErr.Message)
 				
 				// Suggest CSV files in the directory
 				suggestions := validation.SuggestCSVFiles(path)
 				if len(suggestions) > 0 {
-					fmt.Println("\n💡 Found these CSV files in that directory:")
+					m.println("\n💡 Found these CSV files in that directory:")
 					for i, suggestion := range suggestions {
 						if i >= 5 { // Limit suggestions
-							fmt.Printf("   ... and %d more\n", len(suggestions)-5)
+							m.printf("   • %s\n", suggestion)
+						} else {
+							m.printf("   ... and %d more\n", len(suggestions)-5)
 							break
 						}
-						fmt.Printf("   • %s\n", suggestion)
 					}
-					fmt.Println("\nPlease enter the full path to one of these files.")
+					m.println("\nPlease enter the full path to one of these files.")
 				} else {
-					fmt.Printf("\n💡 Try: %s/your-file.csv\n", path)
+					m.printf("\n💡 Try: %s/your-file.csv\n", path)
 				}
 				
 			case "not_found":
-				fmt.Printf("❌ %s\n", csvErr.Message)
-				fmt.Println("💡 Make sure the file path is correct and the file exists.")
+				m.printf("❌ %s\n", csvErr.Message)
+				m.println("💡 Make sure the file path is correct and the file exists.")
 				
 			case "not_readable":
-				fmt.Printf("❌ %s\n", csvErr.Message)
-				fmt.Println("💡 Check file permissions or if the file is open in another program.")
+				m.printf("❌ %s\n", csvErr.Message)
+				m.println("💡 Check file permissions or if the file is open in another program.")
 				
 			case "empty_file":
-				fmt.Printf("❌ %s\n", csvErr.Message)
-				fmt.Println("💡 Make sure your CSV file contains data.")
+				m.printf("❌ %s\n", csvErr.Message)
+				m.println("💡 Make sure your CSV file contains data.")
 				
 			case "invalid_format":
-				fmt.Printf("❌ %s\n", csvErr.Message)
-				fmt.Println("💡 Make sure the file is a text-based CSV file, not binary.")
+				m.printf("❌ %s\n", csvErr.Message)
+				m.println("💡 Make sure the file is a text-based CSV file, not binary.")
 				
 			default:
-				fmt.Printf("❌ %s\n", csvErr.Message)
+				m.printf("❌ %s\n", csvErr.Message)
 			}
 			
+			// The continue here will loop back to readInput, which handles quit
 			continue
 		}
 		
-		fmt.Printf("✅ File validated: %s\n", path)
+		m.printf("✅ File validated: %s\n", path)
 		return path, nil
 	}
 }
 
 func (m *Menu) chooseMode() (bool, error) {
-	fmt.Println("\n🎯 Mode Selection")
-	fmt.Println("----------------")
-	fmt.Println("Choose what you want to generate:")
-	fmt.Println("1. 📊 Reports (story points by contributor, epic, team, or product area)")
-	fmt.Println("2. 📈 Metrics (lead time, throughput, flow efficiency, etc.)")
+	m.println("\n🎯 Mode Selection")
+	m.println("----------------")
+	m.println("Choose what you want to generate:")
+	m.println("1. 📊 Reports (story points by contributor, epic, team, or product area)")
+	m.println("2. 📈 Metrics (lead time, throughput, flow efficiency, etc.)")
 	
 	for {
-		fmt.Print("\nEnter your choice (1 or 2): ")
-		if !m.scanner.Scan() {
-			return false, fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1 or 2): ")
+		if err != nil {
+			return false, err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		switch choice {
 		case "1":
 			return false, nil // Reports mode
 		case "2":
 			return true, nil // Metrics mode
 		default:
-			fmt.Println("❌ Please enter 1 or 2")
+			m.println("❌ Please enter 1 or 2")
 		}
 	}
 }
 
 func (m *Menu) configureReports(cfg *config.Config) error {
-	fmt.Println("\n📊 Report Type Selection")
-	fmt.Println("------------------------")
-	fmt.Println("Available report types:")
-	fmt.Println("1. 👤 Contributor - Story points by person")
-	fmt.Println("2. 🎯 Epic - Story points by epic/initiative")
-	fmt.Println("3. 🏢 Product Area - Story points by product area")
-	fmt.Println("4. 👥 Team - Story points by team")
+	m.println("\n📊 Report Type Selection")
+	m.println("------------------------")
+	m.println("Available report types:")
+	m.println("1. 👤 Contributor - Story points by person")
+	m.println("2. 🎯 Epic - Story points by epic/initiative")
+	m.println("3. 🏢 Product Area - Story points by product area")
+	m.println("4. 👥 Team - Story points by team")
 	
 	for {
-		fmt.Print("\nEnter your choice (1-4): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1-4): ")
+		if err != nil {
+			return err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		var reportType reports.ReportType
 		
 		switch choice {
@@ -208,35 +262,34 @@ func (m *Menu) configureReports(cfg *config.Config) error {
 		case "4":
 			reportType = reports.ReportTypeTeam
 		default:
-			fmt.Println("❌ Please enter a number between 1 and 4")
+			m.println("❌ Please enter a number between 1 and 4")
 			continue
 		}
 		
 		cfg.ReportType = reportType
-		fmt.Printf("✅ Selected: %s report\n", reportType)
+		m.printf("✅ Selected: %s report\n", reportType)
 		return nil
 	}
 }
 
 func (m *Menu) configureMetrics(cfg *config.Config) error {
-	fmt.Println("\n📈 Metrics Type Selection")
-	fmt.Println("-------------------------")
-	fmt.Println("Available metrics:")
-	fmt.Println("1. ⏱️  Lead Time - How long items take to complete")
-	fmt.Println("2. 🚀 Throughput - Completion rates over time")
-	fmt.Println("3. 🌊 Flow Efficiency - Active vs waiting time")
-	fmt.Println("4. 🎯 Estimation Accuracy - Estimate vs actual time correlation")
-	fmt.Println("5. 📅 Work Item Age - Age of current incomplete items")
-	fmt.Println("6. 📊 Team Improvement - Month-over-month trends")
-	fmt.Println("7. 🔄 All Metrics - Generate all of the above")
+	m.println("\n📈 Metrics Type Selection")
+	m.println("-------------------------")
+	m.println("Available metrics:")
+	m.println("1. ⏱️  Lead Time - How long items take to complete")
+	m.println("2. 🚀 Throughput - Completion rates over time")
+	m.println("3. 🌊 Flow Efficiency - Active vs waiting time")
+	m.println("4. 🎯 Estimation Accuracy - Estimate vs actual time correlation")
+	m.println("5. 📅 Work Item Age - Age of current incomplete items")
+	m.println("6. 📊 Team Improvement - Month-over-month trends")
+	m.println("7. 🔄 All Metrics - Generate all of the above")
 	
 	for {
-		fmt.Print("\nEnter your choice (1-7): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1-7): ")
+		if err != nil {
+			return err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		var metricsType metrics.MetricsType
 		
 		switch choice {
@@ -260,7 +313,7 @@ func (m *Menu) configureMetrics(cfg *config.Config) error {
 		}
 		
 		cfg.MetricsType = metricsType
-		fmt.Printf("✅ Selected: %s metrics\n", metricsType)
+		m.printf("✅ Selected: %s metrics\n", metricsType)
 		
 		// For throughput metrics, ask about period
 		if metricsType == metrics.MetricsTypeThroughput || metricsType == metrics.MetricsTypeAll {
@@ -274,79 +327,76 @@ func (m *Menu) configureMetrics(cfg *config.Config) error {
 }
 
 func (m *Menu) configurePeriod(cfg *config.Config) error {
-	fmt.Println("\n⏰ Time Period Selection")
-	fmt.Println("-----------------------")
-	fmt.Println("Choose time period for grouping:")
-	fmt.Println("1. 📅 Week - Group by week")
-	fmt.Println("2. 🗓️  Month - Group by month")
+	m.println("\n⏰ Time Period Selection")
+	m.println("-----------------------")
+	m.println("Choose time period for grouping:")
+	m.println("1. 📅 Week - Group by week")
+	m.println("2. 🗓️  Month - Group by month")
 	
 	for {
-		fmt.Print("\nEnter your choice (1 or 2): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1 or 2): ")
+		if err != nil {
+			return err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		switch choice {
 		case "1":
 			cfg.PeriodType = metrics.PeriodTypeWeek
-			fmt.Println("✅ Selected: Weekly grouping")
+			m.println("✅ Selected: Weekly grouping")
 			return nil
 		case "2":
 			cfg.PeriodType = metrics.PeriodTypeMonth
-			fmt.Println("✅ Selected: Monthly grouping")
+			m.println("✅ Selected: Monthly grouping")
 			return nil
 		default:
-			fmt.Println("❌ Please enter 1 or 2")
+			m.println("❌ Please enter 1 or 2")
 		}
 	}
 }
 
 func (m *Menu) configureDateRange(cfg *config.Config) error {
-	fmt.Println("\n📅 Date Range Selection")
-	fmt.Println("----------------------")
-	fmt.Println("Choose date range:")
-	fmt.Println("1. 🔄 All time - Include all data")
-	fmt.Println("2. 📊 Last N days - Recent data only")
-	fmt.Println("3. 📆 Specific range - Custom start and end dates")
+	m.println("\n📅 Date Range Selection")
+	m.println("----------------------")
+	m.println("Choose date range:")
+	m.println("1. 🔄 All time - Include all data")
+	m.println("2. 📊 Last N days - Recent data only")
+	m.println("3. 📆 Specific range - Custom start and end dates")
 	
 	for {
-		fmt.Print("\nEnter your choice (1-3): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1-3): ")
+		if err != nil {
+			return err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		switch choice {
 		case "1":
-			fmt.Println("✅ Selected: All time")
+			m.println("✅ Selected: All time")
 			return nil
 		case "2":
 			return m.configureLastNDays(cfg)
 		case "3":
 			return m.configureSpecificRange(cfg)
 		default:
-			fmt.Println("❌ Please enter a number between 1 and 3")
+			m.println("❌ Please enter a number between 1 and 3")
 		}
 	}
 }
 
 func (m *Menu) configureLastNDays(cfg *config.Config) error {
-	fmt.Println("\nCommon timeframes:")
-	fmt.Println("- Last 7 days (1 week)")
-	fmt.Println("- Last 30 days (1 month)")
-	fmt.Println("- Last 90 days (1 quarter)")
+	m.println("\nCommon timeframes:")
+	m.println("- Last 7 days (1 week)")
+	m.println("- Last 30 days (1 month)")
+	m.println("- Last 90 days (1 quarter)")
 	
 	for {
-		fmt.Print("\nEnter number of days: ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		input, err := m.readInput("\nEnter number of days: ")
+		if err != nil {
+			return err
 		}
 		
-		input := strings.TrimSpace(m.scanner.Text())
 		days, err := strconv.Atoi(input)
 		if err != nil || days <= 0 {
-			fmt.Println("❌ Please enter a valid positive number")
+			m.println("❌ Please enter a valid positive number")
 			continue
 		}
 		
@@ -354,7 +404,7 @@ func (m *Menu) configureLastNDays(cfg *config.Config) error {
 		cfg.EndDate = time.Now()
 		cfg.StartDate = cfg.EndDate.AddDate(0, 0, -days)
 		
-		fmt.Printf("✅ Selected: Last %d days\n", days)
+		m.printf("✅ Selected: Last %d days\n", days)
 		return nil
 	}
 }
@@ -362,15 +412,14 @@ func (m *Menu) configureLastNDays(cfg *config.Config) error {
 func (m *Menu) configureSpecificRange(cfg *config.Config) error {
 	// Get start date
 	for {
-		fmt.Print("\nEnter start date (YYYY-MM-DD): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		input, err := m.readInput("\nEnter start date (YYYY-MM-DD): ")
+		if err != nil {
+			return err
 		}
 		
-		input := strings.TrimSpace(m.scanner.Text())
 		startDate, err := time.Parse("2006-01-02", input)
 		if err != nil {
-			fmt.Println("❌ Invalid date format. Please use YYYY-MM-DD")
+			m.println("❌ Invalid date format. Please use YYYY-MM-DD")
 			continue
 		}
 		
@@ -380,15 +429,14 @@ func (m *Menu) configureSpecificRange(cfg *config.Config) error {
 	
 	// Get end date
 	for {
-		fmt.Print("Enter end date (YYYY-MM-DD): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		input, err := m.readInput("Enter end date (YYYY-MM-DD): ")
+		if err != nil {
+			return err
 		}
 		
-		input := strings.TrimSpace(m.scanner.Text())
 		endDate, err := time.Parse("2006-01-02", input)
 		if err != nil {
-			fmt.Println("❌ Invalid date format. Please use YYYY-MM-DD")
+			m.println("❌ Invalid date format. Please use YYYY-MM-DD")
 			continue
 		}
 		
@@ -396,7 +444,7 @@ func (m *Menu) configureSpecificRange(cfg *config.Config) error {
 		endDate = endDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 		
 		if endDate.Before(cfg.StartDate) {
-			fmt.Println("❌ End date cannot be before start date")
+			m.println("❌ End date cannot be before start date")
 			continue
 		}
 		
@@ -404,39 +452,38 @@ func (m *Menu) configureSpecificRange(cfg *config.Config) error {
 		break
 	}
 	
-	fmt.Printf("✅ Selected: %s to %s\n", 
+	m.printf("✅ Selected: %s to %s\n", 
 		cfg.StartDate.Format("2006-01-02"), 
 		cfg.EndDate.Format("2006-01-02"))
 	return nil
 }
 
 func (m *Menu) configureFilters(cfg *config.Config) error {
-	fmt.Println("\n🔍 Ad-hoc Request Filtering")
-	fmt.Println("--------------------------")
-	fmt.Println("How should ad-hoc requests be handled?")
-	fmt.Println("1. ✅ Include all items (default)")
-	fmt.Println("2. ❌ Exclude ad-hoc requests")
-	fmt.Println("3. 🎯 Only ad-hoc requests")
+	m.println("\n🔍 Ad-hoc Request Filtering")
+	m.println("--------------------------")
+	m.println("How should ad-hoc requests be handled?")
+	m.println("1. ✅ Include all items (default)")
+	m.println("2. ❌ Exclude ad-hoc requests")
+	m.println("3. 🎯 Only ad-hoc requests")
 	
 	for {
-		fmt.Print("\nEnter your choice (1-3): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1-3): ")
+		if err != nil {
+			return err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		switch choice {
 		case "1", "":
 			cfg.AdHocFilter = "include"
-			fmt.Println("✅ Selected: Include all items")
+			m.println("✅ Selected: Include all items")
 		case "2":
 			cfg.AdHocFilter = "exclude"
-			fmt.Println("✅ Selected: Exclude ad-hoc requests")
+			m.println("✅ Selected: Exclude ad-hoc requests")
 		case "3":
 			cfg.AdHocFilter = "only"
-			fmt.Println("✅ Selected: Only ad-hoc requests")
+			m.println("✅ Selected: Only ad-hoc requests")
 		default:
-			fmt.Println("❌ Please enter a number between 1 and 3")
+			m.println("❌ Please enter a number between 1 and 3")
 			continue
 		}
 		
@@ -447,81 +494,78 @@ func (m *Menu) configureFilters(cfg *config.Config) error {
 }
 
 func (m *Menu) configureOutput(cfg *config.Config) error {
-	fmt.Println("\n💾 Output Configuration")
-	fmt.Println("----------------------")
-	fmt.Println("Where should the report be displayed?")
-	fmt.Println("1. 🖥️  Console only (display on screen)")
-	fmt.Println("2. 📄 Save to file")
+	m.println("\n💾 Output Configuration")
+	m.println("----------------------")
+	m.println("Where should the report be displayed?")
+	m.println("1. 🖥️  Console only (display on screen)")
+	m.println("2. 📄 Save to file")
 	
 	for {
-		fmt.Print("\nEnter your choice (1 or 2): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1 or 2): ")
+		if err != nil {
+			return err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		switch choice {
 		case "1":
-			fmt.Println("✅ Selected: Console output")
+			m.println("✅ Selected: Console output")
 			return nil
 		case "2":
 			return m.configureOutputFile(cfg)
 		default:
-			fmt.Println("❌ Please enter 1 or 2")
+			m.println("❌ Please enter 1 or 2")
 		}
 	}
 }
 
 func (m *Menu) configureOutputFile(cfg *config.Config) error {
 	for {
-		fmt.Print("\nEnter output filename (e.g., report.txt): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		filename, err := m.readInput("\nEnter output filename (e.g., report.txt): ")
+		if err != nil {
+			return err
 		}
 		
-		filename := strings.TrimSpace(m.scanner.Text())
 		if filename == "" {
-			fmt.Println("❌ Please enter a valid filename")
+			m.println("❌ Please enter a valid filename")
 			continue
 		}
 		
 		cfg.OutputPath = filename
-		fmt.Printf("✅ Selected: Save to %s\n", filename)
+		m.printf("✅ Selected: Save to %s\n", filename)
 		return nil
 	}
 }
 
 func (m *Menu) configureDelimiter(cfg *config.Config) error {
-	fmt.Println("\n🔗 CSV Delimiter Configuration")
-	fmt.Println("-----------------------------")
-	fmt.Println("Choose CSV delimiter (auto-detection recommended):")
-	fmt.Println("1. 🤖 Auto-detect (recommended)")
-	fmt.Println("2. , Comma")
-	fmt.Println("3. ; Semicolon")
-	fmt.Println("4. ⭾ Tab")
+	m.println("\n🔗 CSV Delimiter Configuration")
+	m.println("-----------------------------")
+	m.println("Choose CSV delimiter (auto-detection recommended):")
+	m.println("1. 🤖 Auto-detect (recommended)")
+	m.println("2. , Comma")
+	m.println("3. ; Semicolon")
+	m.println("4. ⭾ Tab")
 	
 	for {
-		fmt.Print("\nEnter your choice (1-4): ")
-		if !m.scanner.Scan() {
-			return fmt.Errorf("failed to read input")
+		choice, err := m.readInput("\nEnter your choice (1-4): ")
+		if err != nil {
+			return err
 		}
 		
-		choice := strings.TrimSpace(m.scanner.Text())
 		switch choice {
 		case "1", "":
 			cfg.Delimiter = models.DelimiterAuto
-			fmt.Println("✅ Selected: Auto-detection")
+			m.println("✅ Selected: Auto-detection")
 		case "2":
 			cfg.Delimiter = models.DelimiterComma
-			fmt.Println("✅ Selected: Comma delimiter")
+			m.println("✅ Selected: Comma delimiter")
 		case "3":
 			cfg.Delimiter = models.DelimiterSemicolon
-			fmt.Println("✅ Selected: Semicolon delimiter")
+			m.println("✅ Selected: Semicolon delimiter")
 		case "4":
 			cfg.Delimiter = models.DelimiterTab
-			fmt.Println("✅ Selected: Tab delimiter")
+			m.println("✅ Selected: Tab delimiter")
 		default:
-			fmt.Println("❌ Please enter a number between 1 and 4")
+			m.println("❌ Please enter a number between 1 and 4")
 			continue
 		}
 		return nil
@@ -530,38 +574,38 @@ func (m *Menu) configureDelimiter(cfg *config.Config) error {
 
 // ShowSummary displays a summary of the selected configuration
 func (m *Menu) ShowSummary(cfg *config.Config) {
-	fmt.Println("\n📋 Configuration Summary")
-	fmt.Println("=======================")
-	fmt.Printf("📁 CSV File: %s\n", cfg.CSVPath)
+	m.println("\n📋 Configuration Summary")
+	m.println("=======================")
+	m.printf("📁 CSV File: %s\n", cfg.CSVPath)
 	
 	if cfg.IsMetricsReport() {
-		fmt.Printf("📈 Metrics Type: %s\n", cfg.MetricsType)
+		m.printf("📈 Metrics Type: %s\n", cfg.MetricsType)
 		if cfg.MetricsType == metrics.MetricsTypeThroughput || cfg.MetricsType == metrics.MetricsTypeAll {
-			fmt.Printf("⏰ Period: %s\n", cfg.PeriodType)
+			m.printf("⏰ Period: %s\n", cfg.PeriodType)
 		}
 	} else {
-		fmt.Printf("📊 Report Type: %s\n", cfg.ReportType)
+		m.printf("📊 Report Type: %s\n", cfg.ReportType)
 	}
 	
 	// Date range
 	if cfg.LastNDays > 0 {
-		fmt.Printf("📅 Date Range: Last %d days\n", cfg.LastNDays)
+		m.printf("📅 Date Range: Last %d days\n", cfg.LastNDays)
 	} else if !cfg.StartDate.IsZero() && !cfg.EndDate.IsZero() {
-		fmt.Printf("📅 Date Range: %s to %s\n", 
+		m.printf("📅 Date Range: %s to %s\n", 
 			cfg.StartDate.Format("2006-01-02"), 
 			cfg.EndDate.Format("2006-01-02"))
 	} else {
-		fmt.Printf("📅 Date Range: All time\n")
+		m.printf("📅 Date Range: All time\n")
 	}
 	
-	fmt.Printf("🔍 Ad-hoc Filter: %s\n", cfg.AdHocFilter)
-	fmt.Printf("🔗 Delimiter: %s\n", cfg.Delimiter.Name)
+	m.printf("🔍 Ad-hoc Filter: %s\n", cfg.AdHocFilter)
+	m.printf("🔗 Delimiter: %s\n", cfg.Delimiter.Name)
 	
 	if cfg.OutputPath != "" {
-		fmt.Printf("💾 Output: %s\n", cfg.OutputPath)
+		m.printf("💾 Output: %s\n", cfg.OutputPath)
 	} else {
-		fmt.Printf("💾 Output: Console\n")
+		m.printf("💾 Output: Console\n")
 	}
 	
-	fmt.Println("\n🚀 Generating report...")
+	m.println("\n🚀 Generating report...")
 }
